@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { MessageCircle, Users, Tags, LogOut, Zap, Megaphone, BarChart3, KanbanSquare } from "lucide-react";
+import { MessageCircle, Users, Tags, LogOut, Zap, Megaphone, BarChart3, KanbanSquare, Sparkles, TrendingUp } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/app")({
@@ -11,6 +11,8 @@ const nav = [
   { to: "/app/conversations", label: "Chats", icon: MessageCircle },
   { to: "/app/contacts", label: "Contacts", icon: Users },
   { to: "/app/pipeline", label: "Pipeline", icon: KanbanSquare },
+  { to: "/app/insights", label: "AI Insights", icon: Sparkles },
+  { to: "/app/performance", label: "Performance", icon: TrendingUp },
   { to: "/app/automations", label: "Automations", icon: Zap },
   { to: "/app/broadcasts", label: "Broadcasts", icon: Megaphone },
   { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
