@@ -310,9 +310,3 @@ function ConversationsPage() {
     </div>
   );
 }
-          </>
-        )}
-      </section>
-    </div>
-  );
-}
