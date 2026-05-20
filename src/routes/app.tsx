@@ -81,14 +81,14 @@ function AppLayout() {
           </div>
           <button onClick={() => signOut()} className="text-xs">Sign out</button>
         </header>
-        <nav className="flex border-b bg-sidebar text-sidebar-foreground md:hidden">
+        <nav className="flex overflow-x-auto border-b bg-sidebar text-sidebar-foreground md:hidden">
           {nav.map((item) => {
             const active = pathname.startsWith(item.to);
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex-1 px-3 py-2 text-center text-xs ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}`}
+                className={`shrink-0 px-3 py-2 text-center text-xs ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}`}
               >
                 {item.label}
               </Link>
