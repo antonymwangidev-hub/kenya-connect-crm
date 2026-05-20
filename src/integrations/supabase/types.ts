@@ -14,6 +14,151 @@ export type Database = {
   }
   public: {
     Tables: {
+      automation_rules: {
+        Row: {
+          action: Database["public"]["Enums"]["automation_action"]
+          action_payload: Json
+          business_id: string
+          condition: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          trigger: Database["public"]["Enums"]["automation_trigger"]
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["automation_action"]
+          action_payload?: Json
+          business_id: string
+          condition?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          trigger: Database["public"]["Enums"]["automation_trigger"]
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["automation_action"]
+          action_payload?: Json
+          business_id?: string
+          condition?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          trigger?: Database["public"]["Enums"]["automation_trigger"]
+        }
+        Relationships: []
+      }
+      automation_runs: {
+        Row: {
+          business_id: string
+          contact_id: string | null
+          created_at: string
+          detail: string | null
+          id: string
+          rule_id: string
+          status: string
+        }
+        Insert: {
+          business_id: string
+          contact_id?: string | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          rule_id: string
+          status?: string
+        }
+        Update: {
+          business_id?: string
+          contact_id?: string | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          rule_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_runs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      broadcast_recipients: {
+        Row: {
+          broadcast_id: string
+          channel: string | null
+          contact_id: string
+          error: string | null
+          id: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          broadcast_id: string
+          channel?: string | null
+          contact_id: string
+          error?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          broadcast_id?: string
+          channel?: string | null
+          contact_id?: string
+          error?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broadcast_recipients_broadcast_id_fkey"
+            columns: ["broadcast_id"]
+            isOneToOne: false
+            referencedRelation: "broadcasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      broadcasts: {
+        Row: {
+          business_id: string
+          content: string
+          created_at: string
+          failed_count: number
+          id: string
+          name: string
+          sent_count: number
+          total_recipients: number
+        }
+        Insert: {
+          business_id: string
+          content: string
+          created_at?: string
+          failed_count?: number
+          id?: string
+          name: string
+          sent_count?: number
+          total_recipients?: number
+        }
+        Update: {
+          business_id?: string
+          content?: string
+          created_at?: string
+          failed_count?: number
+          id?: string
+          name?: string
+          sent_count?: number
+          total_recipients?: number
+        }
+        Relationships: []
+      }
       businesses: {
         Row: {
           created_at: string
@@ -72,6 +217,7 @@ export type Database = {
           id: string
           name: string
           phone: string
+          stage: Database["public"]["Enums"]["contact_stage"]
         }
         Insert: {
           business_id: string
@@ -79,6 +225,7 @@ export type Database = {
           id?: string
           name: string
           phone: string
+          stage?: Database["public"]["Enums"]["contact_stage"]
         }
         Update: {
           business_id?: string
@@ -86,6 +233,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string
+          stage?: Database["public"]["Enums"]["contact_stage"]
         }
         Relationships: [
           {
@@ -206,6 +354,9 @@ export type Database = {
       owns_contact: { Args: { _contact_id: string }; Returns: boolean }
     }
     Enums: {
+      automation_action: "send_message" | "add_tag" | "notify_owner"
+      automation_trigger: "new_message" | "tag_added" | "time_delay"
+      contact_stage: "new" | "interested" | "negotiation" | "paid" | "lost"
       message_channel: "manual" | "whatsapp" | "sms"
       message_direction: "inbound" | "outbound"
     }
@@ -335,6 +486,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      automation_action: ["send_message", "add_tag", "notify_owner"],
+      automation_trigger: ["new_message", "tag_added", "time_delay"],
+      contact_stage: ["new", "interested", "negotiation", "paid", "lost"],
       message_channel: ["manual", "whatsapp", "sms"],
       message_direction: ["inbound", "outbound"],
     },

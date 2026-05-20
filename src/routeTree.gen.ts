@@ -13,8 +13,12 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTagsRouteImport } from './routes/app.tags'
+import { Route as AppPipelineRouteImport } from './routes/app.pipeline'
 import { Route as AppConversationsRouteImport } from './routes/app.conversations'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
+import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
+import { Route as AppAutomationsRouteImport } from './routes/app.automations'
+import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 
 const AuthRoute = AuthRouteImport.update({
@@ -37,6 +41,11 @@ const AppTagsRoute = AppTagsRouteImport.update({
   path: '/tags',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPipelineRoute = AppPipelineRouteImport.update({
+  id: '/pipeline',
+  path: '/pipeline',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConversationsRoute = AppConversationsRouteImport.update({
   id: '/conversations',
   path: '/conversations',
@@ -45,6 +54,21 @@ const AppConversationsRoute = AppConversationsRouteImport.update({
 const AppContactsRoute = AppContactsRouteImport.update({
   id: '/contacts',
   path: '/contacts',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBroadcastsRoute = AppBroadcastsRouteImport.update({
+  id: '/broadcasts',
+  path: '/broadcasts',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAutomationsRoute = AppAutomationsRouteImport.update({
+  id: '/automations',
+  path: '/automations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiPublicWhatsappWebhookRoute =
@@ -58,8 +82,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
+  '/app/analytics': typeof AppAnalyticsRoute
+  '/app/automations': typeof AppAutomationsRoute
+  '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/pipeline': typeof AppPipelineRoute
   '/app/tags': typeof AppTagsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
@@ -67,8 +95,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
+  '/app/analytics': typeof AppAnalyticsRoute
+  '/app/automations': typeof AppAutomationsRoute
+  '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/pipeline': typeof AppPipelineRoute
   '/app/tags': typeof AppTagsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
@@ -77,8 +109,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
+  '/app/analytics': typeof AppAnalyticsRoute
+  '/app/automations': typeof AppAutomationsRoute
+  '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/pipeline': typeof AppPipelineRoute
   '/app/tags': typeof AppTagsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
@@ -88,8 +124,12 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/auth'
+    | '/app/analytics'
+    | '/app/automations'
+    | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/pipeline'
     | '/app/tags'
     | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -97,8 +137,12 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/auth'
+    | '/app/analytics'
+    | '/app/automations'
+    | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/pipeline'
     | '/app/tags'
     | '/api/public/whatsapp/webhook'
   id:
@@ -106,8 +150,12 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/auth'
+    | '/app/analytics'
+    | '/app/automations'
+    | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/pipeline'
     | '/app/tags'
     | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
@@ -149,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTagsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/pipeline': {
+      id: '/app/pipeline'
+      path: '/pipeline'
+      fullPath: '/app/pipeline'
+      preLoaderRoute: typeof AppPipelineRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/conversations': {
       id: '/app/conversations'
       path: '/conversations'
@@ -163,6 +218,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContactsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/broadcasts': {
+      id: '/app/broadcasts'
+      path: '/broadcasts'
+      fullPath: '/app/broadcasts'
+      preLoaderRoute: typeof AppBroadcastsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/automations': {
+      id: '/app/automations'
+      path: '/automations'
+      fullPath: '/app/automations'
+      preLoaderRoute: typeof AppAutomationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/analytics': {
+      id: '/app/analytics'
+      path: '/analytics'
+      fullPath: '/app/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/public/whatsapp/webhook': {
       id: '/api/public/whatsapp/webhook'
       path: '/api/public/whatsapp/webhook'
@@ -174,14 +250,22 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
+  AppAutomationsRoute: typeof AppAutomationsRoute
+  AppBroadcastsRoute: typeof AppBroadcastsRoute
   AppContactsRoute: typeof AppContactsRoute
   AppConversationsRoute: typeof AppConversationsRoute
+  AppPipelineRoute: typeof AppPipelineRoute
   AppTagsRoute: typeof AppTagsRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
+  AppAutomationsRoute: AppAutomationsRoute,
+  AppBroadcastsRoute: AppBroadcastsRoute,
   AppContactsRoute: AppContactsRoute,
   AppConversationsRoute: AppConversationsRoute,
+  AppPipelineRoute: AppPipelineRoute,
   AppTagsRoute: AppTagsRoute,
 }
 

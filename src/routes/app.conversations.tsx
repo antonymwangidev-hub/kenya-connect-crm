@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Send, ArrowDownLeft, ArrowUpRight, MessageCircle, Phone } from "lucide-react";
+import { Send, ArrowDownLeft, ArrowUpRight, MessageCircle, Phone, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
+import { suggestFollowUp } from "@/lib/automation.functions";
 
 export const Route = createFileRoute("/app/conversations")({
   component: ConversationsPage,
@@ -49,6 +50,8 @@ function ChannelBadge({ channel }: { channel: Channel }) {
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
+  const suggestFn = useServerFn(suggestFollowUp);
+  const [suggesting, setSuggesting] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -275,6 +278,27 @@ function ConversationsPage() {
                   className="flex-1"
                   disabled={sending}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={suggesting || !active}
+                  title="AI suggest follow-up"
+                  onClick={async () => {
+                    if (!active) return;
+                    setSuggesting(true);
+                    try {
+                      const { suggestion } = await suggestFn({ data: { contactId: active.id } });
+                      if (suggestion) setDraft(suggestion);
+                      else toast.error("No suggestion returned");
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "AI failed");
+                    } finally {
+                      setSuggesting(false);
+                    }
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                </Button>
                 <Button type="submit" disabled={!draft.trim() || sending}>
                   <Send className="h-4 w-4" />
                 </Button>
