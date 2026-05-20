@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTagsRouteImport } from './routes/app.tags'
 import { Route as AppConversationsRouteImport } from './routes/app.conversations'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
+import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
 import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 
@@ -48,6 +49,11 @@ const AppContactsRoute = AppContactsRouteImport.update({
   path: '/contacts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBroadcastsRoute = AppBroadcastsRouteImport.update({
+  id: '/broadcasts',
+  path: '/broadcasts',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAutomationsRoute = AppAutomationsRouteImport.update({
   id: '/automations',
   path: '/automations',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/app/automations': typeof AppAutomationsRoute
+  '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/tags': typeof AppTagsRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/app/automations': typeof AppAutomationsRoute
+  '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/tags': typeof AppTagsRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/app/automations': typeof AppAutomationsRoute
+  '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/tags': typeof AppTagsRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/app/automations'
+    | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
     | '/app/tags'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/app/automations'
+    | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
     | '/app/tags'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/app/automations'
+    | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
     | '/app/tags'
@@ -175,6 +187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContactsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/broadcasts': {
+      id: '/app/broadcasts'
+      path: '/broadcasts'
+      fullPath: '/app/broadcasts'
+      preLoaderRoute: typeof AppBroadcastsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/automations': {
       id: '/app/automations'
       path: '/automations'
@@ -194,6 +213,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAutomationsRoute: typeof AppAutomationsRoute
+  AppBroadcastsRoute: typeof AppBroadcastsRoute
   AppContactsRoute: typeof AppContactsRoute
   AppConversationsRoute: typeof AppConversationsRoute
   AppTagsRoute: typeof AppTagsRoute
@@ -201,6 +221,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAutomationsRoute: AppAutomationsRoute,
+  AppBroadcastsRoute: AppBroadcastsRoute,
   AppContactsRoute: AppContactsRoute,
   AppConversationsRoute: AppConversationsRoute,
   AppTagsRoute: AppTagsRoute,
@@ -217,3 +238,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
