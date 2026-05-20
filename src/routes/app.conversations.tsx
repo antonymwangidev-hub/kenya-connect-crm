@@ -278,11 +278,38 @@ function ConversationsPage() {
                   className="flex-1"
                   disabled={sending}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={suggesting || !active}
+                  title="AI suggest follow-up"
+                  onClick={async () => {
+                    if (!active) return;
+                    setSuggesting(true);
+                    try {
+                      const { suggestion } = await suggestFn({ data: { contactId: active.id } });
+                      if (suggestion) setDraft(suggestion);
+                      else toast.error("No suggestion returned");
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "AI failed");
+                    } finally {
+                      setSuggesting(false);
+                    }
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                </Button>
                 <Button type="submit" disabled={!draft.trim() || sending}>
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
             </form>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
           </>
         )}
       </section>
