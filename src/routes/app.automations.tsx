@@ -115,8 +115,8 @@ function AutomationsPage() {
       name: name.trim(),
       trigger,
       action,
-      condition,
-      action_payload,
+      condition: condition as never,
+      action_payload: action_payload as never,
     });
     if (error) return toast.error(error.message);
     toast.success("Rule created");
