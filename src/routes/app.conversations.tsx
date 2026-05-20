@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Send, ArrowDownLeft, ArrowUpRight, MessageCircle, Phone } from "lucide-react";
+import { Send, ArrowDownLeft, ArrowUpRight, MessageCircle, Phone, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
+import { suggestFollowUp } from "@/lib/automation.functions";
 
 export const Route = createFileRoute("/app/conversations")({
   component: ConversationsPage,
