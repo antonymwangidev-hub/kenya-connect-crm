@@ -256,14 +256,14 @@ function ConversationsPage() {
             </div>
 
             <form onSubmit={send} className="border-t bg-card p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs">
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
                 <span className="text-muted-foreground">Mode:</span>
                 <button
                   type="button"
                   onClick={() => setDirection("outbound")}
                   className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
                 >
-                  <ArrowUpRight className="h-3 w-3" /> Send (WhatsApp→SMS)
+                  <ArrowUpRight className="h-3 w-3" /> Send
                 </button>
                 <button
                   type="button"
@@ -272,6 +272,17 @@ function ConversationsPage() {
                 >
                   <ArrowDownLeft className="h-3 w-3" /> Simulate inbound
                 </button>
+                <span className="ml-2 text-muted-foreground">AI tone:</span>
+                {(["polite", "sales", "urgent"] as Tone[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTone(t)}
+                    className={`rounded-full px-2.5 py-1 capitalize ${tone === t ? "bg-primary/20 text-primary" : "bg-muted"}`}
+                  >
+                    {t}
+                  </button>
+                ))}
               </div>
               <div className="flex gap-2">
                 <Input
