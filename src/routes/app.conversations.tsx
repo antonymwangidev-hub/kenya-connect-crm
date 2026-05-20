@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
-import { suggestFollowUp } from "@/lib/automation.functions";
+import { suggestReply } from "@/lib/ai.functions";
+
+type Tone = "polite" | "sales" | "urgent";
 
 export const Route = createFileRoute("/app/conversations")({
   component: ConversationsPage,
