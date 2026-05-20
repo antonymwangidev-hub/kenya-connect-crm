@@ -280,6 +280,39 @@ export type Database = {
           },
         ]
       }
+      revenue_entries: {
+        Row: {
+          amount: number
+          business_id: string
+          contact_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          note: string | null
+          occurred_at: string
+        }
+        Insert: {
+          amount: number
+          business_id: string
+          contact_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          note?: string | null
+          occurred_at?: string
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          contact_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          note?: string | null
+          occurred_at?: string
+        }
+        Relationships: []
+      }
       sms_logs: {
         Row: {
           business_id: string
