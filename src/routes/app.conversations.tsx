@@ -102,7 +102,7 @@ function ConversationsPage() {
   return (
     <div className="flex h-[calc(100vh-0px)] md:h-screen">
       {/* Contact list */}
-      <aside className="w-full max-w-xs shrink-0 border-r bg-card md:block" style={{ display: active && window.innerWidth < 768 ? "none" : undefined }}>
+      <aside className={`${active ? "hidden md:block" : "block"} w-full shrink-0 border-r bg-card md:max-w-xs`}>
         <div className="border-b px-4 py-3">
           <h2 className="font-semibold">Chats</h2>
           <p className="text-xs text-muted-foreground">{contacts.length} contact{contacts.length === 1 ? "" : "s"}</p>
