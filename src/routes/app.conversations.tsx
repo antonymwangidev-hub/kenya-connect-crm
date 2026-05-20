@@ -50,6 +50,8 @@ function ChannelBadge({ channel }: { channel: Channel }) {
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
+  const suggestFn = useServerFn(suggestFollowUp);
+  const [suggesting, setSuggesting] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
