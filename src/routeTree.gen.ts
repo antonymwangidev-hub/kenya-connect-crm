@@ -14,6 +14,8 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTagsRouteImport } from './routes/app.tags'
 import { Route as AppPipelineRouteImport } from './routes/app.pipeline'
+import { Route as AppPerformanceRouteImport } from './routes/app.performance'
+import { Route as AppInsightsRouteImport } from './routes/app.insights'
 import { Route as AppConversationsRouteImport } from './routes/app.conversations'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
 import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
@@ -44,6 +46,16 @@ const AppTagsRoute = AppTagsRouteImport.update({
 const AppPipelineRoute = AppPipelineRouteImport.update({
   id: '/pipeline',
   path: '/pipeline',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPerformanceRoute = AppPerformanceRouteImport.update({
+  id: '/performance',
+  path: '/performance',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInsightsRoute = AppInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
   getParentRoute: () => AppRoute,
 } as any)
 const AppConversationsRoute = AppConversationsRouteImport.update({
@@ -87,6 +99,8 @@ export interface FileRoutesByFullPath {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/insights': typeof AppInsightsRoute
+  '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
   '/app/tags': typeof AppTagsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -100,6 +114,8 @@ export interface FileRoutesByTo {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/insights': typeof AppInsightsRoute
+  '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
   '/app/tags': typeof AppTagsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -114,6 +130,8 @@ export interface FileRoutesById {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/insights': typeof AppInsightsRoute
+  '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
   '/app/tags': typeof AppTagsRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -129,6 +147,8 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/insights'
+    | '/app/performance'
     | '/app/pipeline'
     | '/app/tags'
     | '/api/public/whatsapp/webhook'
@@ -142,6 +162,8 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/insights'
+    | '/app/performance'
     | '/app/pipeline'
     | '/app/tags'
     | '/api/public/whatsapp/webhook'
@@ -155,6 +177,8 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/insights'
+    | '/app/performance'
     | '/app/pipeline'
     | '/app/tags'
     | '/api/public/whatsapp/webhook'
@@ -202,6 +226,20 @@ declare module '@tanstack/react-router' {
       path: '/pipeline'
       fullPath: '/app/pipeline'
       preLoaderRoute: typeof AppPipelineRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/performance': {
+      id: '/app/performance'
+      path: '/performance'
+      fullPath: '/app/performance'
+      preLoaderRoute: typeof AppPerformanceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/insights': {
+      id: '/app/insights'
+      path: '/insights'
+      fullPath: '/app/insights'
+      preLoaderRoute: typeof AppInsightsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/conversations': {
@@ -255,6 +293,8 @@ interface AppRouteChildren {
   AppBroadcastsRoute: typeof AppBroadcastsRoute
   AppContactsRoute: typeof AppContactsRoute
   AppConversationsRoute: typeof AppConversationsRoute
+  AppInsightsRoute: typeof AppInsightsRoute
+  AppPerformanceRoute: typeof AppPerformanceRoute
   AppPipelineRoute: typeof AppPipelineRoute
   AppTagsRoute: typeof AppTagsRoute
 }
@@ -265,6 +305,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppBroadcastsRoute: AppBroadcastsRoute,
   AppContactsRoute: AppContactsRoute,
   AppConversationsRoute: AppConversationsRoute,
+  AppInsightsRoute: AppInsightsRoute,
+  AppPerformanceRoute: AppPerformanceRoute,
   AppPipelineRoute: AppPipelineRoute,
   AppTagsRoute: AppTagsRoute,
 }

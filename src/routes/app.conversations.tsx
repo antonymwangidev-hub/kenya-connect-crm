@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
-import { suggestFollowUp } from "@/lib/automation.functions";
+import { suggestReply } from "@/lib/ai.functions";
+
+type Tone = "polite" | "sales" | "urgent";
 
 export const Route = createFileRoute("/app/conversations")({
   component: ConversationsPage,
@@ -50,8 +52,9 @@ function ChannelBadge({ channel }: { channel: Channel }) {
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
-  const suggestFn = useServerFn(suggestFollowUp);
+  const suggestFn = useServerFn(suggestReply);
   const [suggesting, setSuggesting] = useState(false);
+  const [tone, setTone] = useState<Tone>("polite");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -253,14 +256,14 @@ function ConversationsPage() {
             </div>
 
             <form onSubmit={send} className="border-t bg-card p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs">
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
                 <span className="text-muted-foreground">Mode:</span>
                 <button
                   type="button"
                   onClick={() => setDirection("outbound")}
                   className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
                 >
-                  <ArrowUpRight className="h-3 w-3" /> Send (WhatsApp→SMS)
+                  <ArrowUpRight className="h-3 w-3" /> Send
                 </button>
                 <button
                   type="button"
@@ -269,6 +272,17 @@ function ConversationsPage() {
                 >
                   <ArrowDownLeft className="h-3 w-3" /> Simulate inbound
                 </button>
+                <span className="ml-2 text-muted-foreground">AI tone:</span>
+                {(["polite", "sales", "urgent"] as Tone[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTone(t)}
+                    className={`rounded-full px-2.5 py-1 capitalize ${tone === t ? "bg-primary/20 text-primary" : "bg-muted"}`}
+                  >
+                    {t}
+                  </button>
+                ))}
               </div>
               <div className="flex gap-2">
                 <Input
@@ -287,7 +301,7 @@ function ConversationsPage() {
                     if (!active) return;
                     setSuggesting(true);
                     try {
-                      const { suggestion } = await suggestFn({ data: { contactId: active.id } });
+                      const { suggestion } = await suggestFn({ data: { contactId: active.id, tone } });
                       if (suggestion) setDraft(suggestion);
                       else toast.error("No suggestion returned");
                     } catch (err) {
