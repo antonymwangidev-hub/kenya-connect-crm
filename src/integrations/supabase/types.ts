@@ -99,6 +99,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          channel: Database["public"]["Enums"]["message_channel"]
           contact_id: string
           content: string
           created_at: string
@@ -106,6 +107,7 @@ export type Database = {
           id: string
         }
         Insert: {
+          channel?: Database["public"]["Enums"]["message_channel"]
           contact_id: string
           content: string
           created_at?: string
@@ -113,6 +115,7 @@ export type Database = {
           id?: string
         }
         Update: {
+          channel?: Database["public"]["Enums"]["message_channel"]
           contact_id?: string
           content?: string
           created_at?: string
@@ -128,6 +131,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sms_logs: {
+        Row: {
+          business_id: string
+          contact_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          message: string
+          phone: string
+          provider_sid: string | null
+          status: string
+        }
+        Insert: {
+          business_id: string
+          contact_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          message: string
+          phone: string
+          provider_sid?: string | null
+          status?: string
+        }
+        Update: {
+          business_id?: string
+          contact_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          message?: string
+          phone?: string
+          provider_sid?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       tags: {
         Row: {
@@ -167,6 +206,7 @@ export type Database = {
       owns_contact: { Args: { _contact_id: string }; Returns: boolean }
     }
     Enums: {
+      message_channel: "manual" | "whatsapp" | "sms"
       message_direction: "inbound" | "outbound"
     }
     CompositeTypes: {
@@ -295,6 +335,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      message_channel: ["manual", "whatsapp", "sms"],
       message_direction: ["inbound", "outbound"],
     },
   },
