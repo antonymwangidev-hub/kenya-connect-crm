@@ -301,7 +301,7 @@ function ConversationsPage() {
                     if (!active) return;
                     setSuggesting(true);
                     try {
-                      const { suggestion } = await suggestFn({ data: { contactId: active.id } });
+                      const { suggestion } = await suggestFn({ data: { contactId: active.id, tone } });
                       if (suggestion) setDraft(suggestion);
                       else toast.error("No suggestion returned");
                     } catch (err) {
