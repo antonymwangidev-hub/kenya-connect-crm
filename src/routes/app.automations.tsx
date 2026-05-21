@@ -242,13 +242,42 @@ function AutomationsPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
+        <div className="mb-6 rounded-lg border bg-card p-4">
+          <p className="mb-2 text-sm font-medium">Quick templates</p>
+          <p className="mb-3 text-xs text-muted-foreground">Tap to pre-fill the rule builder, then customize.</p>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { label: "Follow up interested leads", n: "Follow up interested leads", tr: "tag_added" as Trigger, ac: "send_message" as Action, c: "interested", a: "Hi! Just checking in — would you like to move forward today?" },
+              { label: "Re-engage after 24h silence", n: "Re-engage after 24h", tr: "time_delay" as Trigger, ac: "send_message" as Action, c: "24", a: "Hello! Did you get a chance to look at our offer?" },
+              { label: "Tag new leads", n: "Tag new inbound leads", tr: "new_message" as Trigger, ac: "add_tag" as Action, c: "", a: "new" },
+              { label: "Notify me on 'price'", n: "Alert on price keyword", tr: "new_message" as Trigger, ac: "notify_owner" as Action, c: "price", a: "Lead asked about pricing." },
+              { label: "Auto-reply 'menu'", n: "Auto-reply menu keyword", tr: "new_message" as Trigger, ac: "send_message" as Action, c: "menu", a: "Here is our menu: …" },
+            ]).map((tpl) => (
+              <button
+                key={tpl.label}
+                onClick={() => {
+                  setName(tpl.n);
+                  setTrigger(tpl.tr);
+                  setAction(tpl.ac);
+                  setCondText(tpl.c);
+                  setActionText(tpl.a);
+                  setOpen(true);
+                }}
+                className="rounded-full border bg-background px-3 py-1 text-xs hover:bg-muted"
+              >
+                {tpl.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : rules.length === 0 ? (
           <div className="rounded-lg border border-dashed bg-card p-12 text-center">
             <Zap className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              No automations yet. Create your first rule.
+              No automations yet. Pick a template above or create one from scratch.
             </p>
           </div>
         ) : (

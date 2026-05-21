@@ -245,11 +245,45 @@ export type Database = {
           },
         ]
       }
+      conversations: {
+        Row: {
+          business_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          last_direction: string | null
+          last_message_at: string
+          last_message_preview: string | null
+          unread_count: number
+        }
+        Insert: {
+          business_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          last_direction?: string | null
+          last_message_at?: string
+          last_message_preview?: string | null
+          unread_count?: number
+        }
+        Update: {
+          business_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          last_direction?: string | null
+          last_message_at?: string
+          last_message_preview?: string | null
+          unread_count?: number
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           channel: Database["public"]["Enums"]["message_channel"]
           contact_id: string
           content: string
+          conversation_id: string | null
           created_at: string
           direction: Database["public"]["Enums"]["message_direction"]
           id: string
@@ -258,6 +292,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["message_channel"]
           contact_id: string
           content: string
+          conversation_id?: string | null
           created_at?: string
           direction: Database["public"]["Enums"]["message_direction"]
           id?: string
@@ -266,6 +301,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["message_channel"]
           contact_id?: string
           content?: string
+          conversation_id?: string | null
           created_at?: string
           direction?: Database["public"]["Enums"]["message_direction"]
           id?: string
