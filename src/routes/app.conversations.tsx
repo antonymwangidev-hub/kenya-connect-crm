@@ -1,7 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Send, ArrowDownLeft, ArrowUpRight, MessageCircle, Phone, Sparkles } from "lucide-react";
+import {
+  Send,
+  ArrowDownLeft,
+  ArrowUpRight,
+  MessageCircle,
+  Phone,
+  Sparkles,
+  Search,
+  ArrowLeft,
+  Wand2,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -16,11 +26,20 @@ export const Route = createFileRoute("/app/conversations")({
   component: ConversationsPage,
 });
 
-type Contact = { id: string; name: string; phone: string };
 type Channel = "manual" | "whatsapp" | "sms";
+type Conversation = {
+  id: string;
+  contact_id: string;
+  last_message_at: string;
+  last_message_preview: string | null;
+  last_direction: string | null;
+  unread_count: number;
+  contact: { id: string; name: string; phone: string };
+};
 type Message = {
   id: string;
   contact_id: string;
+  conversation_id: string | null;
   direction: "inbound" | "outbound";
   content: string;
   channel: Channel;
@@ -49,55 +68,74 @@ function ChannelBadge({ channel }: { channel: Channel }) {
   );
 }
 
+function timeAgo(iso: string) {
+  const d = new Date(iso);
+  const now = Date.now();
+  const diff = Math.floor((now - d.getTime()) / 1000);
+  if (diff < 60) return "now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  const days = Math.floor(diff / 86400);
+  if (days < 7) return `${days}d`;
+  return d.toLocaleDateString();
+}
+
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
   const suggestFn = useServerFn(suggestReply);
   const [suggesting, setSuggesting] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [tone, setTone] = useState<Tone>("polite");
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
   const [sending, setSending] = useState(false);
+  const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Load conversations + realtime
   useEffect(() => {
     if (!businessId) return;
-    supabase
-      .from("contacts")
-      .select("id,name,phone")
-      .eq("business_id", businessId)
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) { toast.error(error.message); return; }
-        setContacts(data ?? []);
-        if (data && data.length > 0 && !activeId) setActiveId(data[0].id);
-      });
+    let cancelled = false;
+    const fetchConvs = async () => {
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("id,contact_id,last_message_at,last_message_preview,last_direction,unread_count,contact:contacts!inner(id,name,phone)")
+        .eq("business_id", businessId)
+        .order("last_message_at", { ascending: false });
+      if (cancelled) return;
+      if (error) { toast.error(error.message); return; }
+      setConversations((data as unknown as Conversation[]) ?? []);
+    };
+    fetchConvs();
 
-    // Realtime: refresh contacts when new ones auto-created from inbound messages
     const ch = supabase
-      .channel(`contacts-${businessId}`)
+      .channel(`conv-${businessId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "contacts", filter: `business_id=eq.${businessId}` },
-        (payload) => {
-          const c = payload.new as Contact;
-          setContacts((prev) => (prev.some((x) => x.id === c.id) ? prev : [c, ...prev]));
-        },
+        { event: "*", schema: "public", table: "conversations", filter: `business_id=eq.${businessId}` },
+        () => { fetchConvs(); },
       )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { cancelled = true; supabase.removeChannel(ch); };
   }, [businessId]);
 
+  const active = useMemo(
+    () => conversations.find((c) => c.id === activeId) ?? null,
+    [conversations, activeId],
+  );
+
+  // Load messages for active conversation + realtime + mark read
   useEffect(() => {
-    if (!activeId) { setMessages([]); return; }
+    if (!active) { setMessages([]); return; }
     let cancelled = false;
     supabase
       .from("messages")
       .select("*")
-      .eq("contact_id", activeId)
+      .eq("conversation_id", active.id)
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -105,41 +143,52 @@ function ConversationsPage() {
         setMessages((data ?? []) as Message[]);
       });
 
+    // Reset unread
+    if (active.unread_count > 0) {
+      supabase.from("conversations").update({ unread_count: 0 }).eq("id", active.id).then(() => {});
+    }
+
     const channel = supabase
-      .channel(`msg-${activeId}`)
+      .channel(`msg-${active.id}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `contact_id=eq.${activeId}` },
+        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${active.id}` },
         (payload) => {
-          setMessages((prev) => {
-            const m = payload.new as Message;
-            if (prev.some((x) => x.id === m.id)) return prev;
-            return [...prev, m];
-          });
+          const m = payload.new as Message;
+          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+          // keep unread cleared while viewing
+          supabase.from("conversations").update({ unread_count: 0 }).eq("id", active.id).then(() => {});
         },
       )
       .subscribe();
 
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [activeId]);
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [active?.id]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter(
+      (c) =>
+        c.contact.name.toLowerCase().includes(q) ||
+        c.contact.phone.includes(q) ||
+        (c.last_message_preview ?? "").toLowerCase().includes(q),
+    );
+  }, [conversations, search]);
+
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeId || !draft.trim() || sending) return;
+    if (!active || !draft.trim() || sending) return;
     const content = draft.trim();
     setDraft("");
 
-    // Simulated inbound: write directly as manual
     if (direction === "inbound") {
       const { error } = await supabase.from("messages").insert({
-        contact_id: activeId,
+        contact_id: active.contact_id,
         direction: "inbound",
         content,
         channel: "manual",
@@ -148,17 +197,15 @@ function ConversationsPage() {
       return;
     }
 
-    // Real outbound: try WhatsApp -> SMS fallback via server fn
     setSending(true);
     try {
-      const result = await sendFn({ data: { contactId: activeId, content } });
+      const result = await sendFn({ data: { contactId: active.contact_id, content } });
       toast.success(`Sent via ${result.channel}`);
     } catch (err) {
-      // Fallback: still record as manual so the chat doesn't lose the message
       const msg = err instanceof Error ? err.message : "Send failed";
       toast.error(msg);
       await supabase.from("messages").insert({
-        contact_id: activeId,
+        contact_id: active.contact_id,
         direction: "outbound",
         content,
         channel: "manual",
@@ -168,35 +215,88 @@ function ConversationsPage() {
     }
   };
 
-  const active = contacts.find((c) => c.id === activeId);
+  const generateFollowUp = async () => {
+    if (!active) return;
+    setGenerating(true);
+    try {
+      const { suggestion } = await suggestFn({ data: { contactId: active.contact_id, tone } });
+      if (suggestion) {
+        setDraft(suggestion);
+        setDirection("outbound");
+        toast.success("Follow-up ready — review and send");
+      } else {
+        toast.error("No suggestion returned");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "AI failed");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
-    <div className="flex h-[calc(100vh-0px)] md:h-screen">
-      <aside className={`${active ? "hidden md:block" : "block"} w-full shrink-0 border-r bg-card md:max-w-xs`}>
+    <div className="flex h-screen">
+      {/* Conversation list */}
+      <aside className={`${active ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col border-r bg-card md:max-w-xs`}>
         <div className="border-b px-4 py-3">
           <h2 className="font-semibold">Inbox</h2>
-          <p className="text-xs text-muted-foreground">{contacts.length} contact{contacts.length === 1 ? "" : "s"}</p>
+          <p className="text-xs text-muted-foreground">
+            {conversations.length} conversation{conversations.length === 1 ? "" : "s"}
+          </p>
         </div>
-        <div className="overflow-y-auto">
-          {contacts.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">No contacts yet. Incoming WhatsApp messages create them automatically, or add one from Contacts.</p>
+        <div className="border-b px-3 py-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-9 pl-8"
+              placeholder="Search name, phone, message…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              {conversations.length === 0
+                ? "No conversations yet. Incoming WhatsApp messages create them automatically, or add a contact."
+                : "No matches."}
+            </p>
           ) : (
-            contacts.map((c) => {
+            filtered.map((c) => {
               const isActive = c.id === activeId;
+              const unread = c.unread_count > 0;
               return (
                 <button
                   key={c.id}
                   onClick={() => setActiveId(c.id)}
-                  className={`flex w-full items-center gap-3 border-b px-4 py-3 text-left transition ${
+                  className={`flex w-full items-start gap-3 border-b px-4 py-3 text-left transition ${
                     isActive ? "bg-accent" : "hover:bg-muted"
                   }`}
                 >
-                  <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                    {c.name.slice(0, 1).toUpperCase()}
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                    {c.contact.name.slice(0, 1).toUpperCase()}
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{c.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{c.phone}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"}`}>
+                        {c.contact.name}
+                      </p>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {timeAgo(c.last_message_at)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`truncate text-xs ${unread ? "text-foreground" : "text-muted-foreground"}`}>
+                        {c.last_direction === "outbound" && "You: "}
+                        {c.last_message_preview ?? c.contact.phone}
+                      </p>
+                      {unread && (
+                        <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                          {c.unread_count}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
@@ -205,27 +305,35 @@ function ConversationsPage() {
         </div>
       </aside>
 
-      <section className="flex flex-1 flex-col" style={{ backgroundColor: "var(--chat-bg)" }}>
+      {/* Chat panel */}
+      <section className={`${active ? "flex" : "hidden md:flex"} flex-1 flex-col`} style={{ backgroundColor: "var(--chat-bg)" }}>
         {!active ? (
           <div className="grid flex-1 place-items-center text-center text-muted-foreground">
             <div>
               <MessageCircle className="mx-auto h-10 w-10 opacity-40" />
-              <p className="mt-3 text-sm">Select a contact to start chatting</p>
+              <p className="mt-3 text-sm">Select a conversation</p>
             </div>
           </div>
         ) : (
           <>
             <header className="flex items-center gap-3 border-b bg-card px-4 py-3">
+              <button
+                onClick={() => setActiveId(null)}
+                className="rounded-md p-1 hover:bg-muted md:hidden"
+                aria-label="Back"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
               <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                {active.name.slice(0, 1).toUpperCase()}
+                {active.contact.name.slice(0, 1).toUpperCase()}
               </div>
-              <div>
-                <p className="text-sm font-medium">{active.name}</p>
-                <p className="text-xs text-muted-foreground">{active.phone}</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{active.contact.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{active.contact.phone}</p>
               </div>
             </header>
 
-            <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto px-4 py-6">
+            <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto scroll-smooth px-4 py-6">
               {messages.length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground">No messages yet. Send the first one.</p>
               ) : (
@@ -257,7 +365,6 @@ function ConversationsPage() {
 
             <form onSubmit={send} className="border-t bg-card p-3">
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="text-muted-foreground">Mode:</span>
                 <button
                   type="button"
                   onClick={() => setDirection("outbound")}
@@ -272,7 +379,7 @@ function ConversationsPage() {
                 >
                   <ArrowDownLeft className="h-3 w-3" /> Simulate inbound
                 </button>
-                <span className="ml-2 text-muted-foreground">AI tone:</span>
+                <span className="ml-2 text-muted-foreground">Tone:</span>
                 {(["polite", "sales", "urgent"] as Tone[]).map((t) => (
                   <button
                     key={t}
@@ -283,6 +390,17 @@ function ConversationsPage() {
                     {t}
                   </button>
                 ))}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto h-7 gap-1 text-xs"
+                  disabled={generating}
+                  onClick={generateFollowUp}
+                >
+                  <Wand2 className="h-3 w-3" />
+                  {generating ? "Generating…" : "AI Follow-up"}
+                </Button>
               </div>
               <div className="flex gap-2">
                 <Input
@@ -296,12 +414,12 @@ function ConversationsPage() {
                   type="button"
                   variant="outline"
                   disabled={suggesting || !active}
-                  title="AI suggest follow-up"
+                  title="Quick AI suggestion"
                   onClick={async () => {
                     if (!active) return;
                     setSuggesting(true);
                     try {
-                      const { suggestion } = await suggestFn({ data: { contactId: active.id, tone } });
+                      const { suggestion } = await suggestFn({ data: { contactId: active.contact_id, tone } });
                       if (suggestion) setDraft(suggestion);
                       else toast.error("No suggestion returned");
                     } catch (err) {
