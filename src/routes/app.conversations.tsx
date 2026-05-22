@@ -80,6 +80,37 @@ function timeAgo(iso: string) {
   return d.toLocaleDateString();
 }
 
+function dateLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, today)) return "Today";
+  if (sameDay(d, yest)) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function ConvSkeleton() {
+  return (
+    <div className="flex animate-pulse items-start gap-3 border-b px-4 py-3">
+      <div className="h-10 w-10 shrink-0 rounded-full bg-muted" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 w-1/2 rounded bg-muted" />
+        <div className="h-3 w-3/4 rounded bg-muted/70" />
+      </div>
+    </div>
+  );
+}
+
+function MsgSkeleton({ out }: { out?: boolean }) {
+  return (
+    <div className={`flex ${out ? "justify-end" : "justify-start"} animate-pulse`}>
+      <div className="h-10 w-40 max-w-[60%] rounded-2xl bg-muted/60" />
+    </div>
+  );
+}
+
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
@@ -88,36 +119,43 @@ function ConversationsPage() {
   const [generating, setGenerating] = useState(false);
   const [tone, setTone] = useState<Tone>("polite");
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [convLoading, setConvLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
   const [draft, setDraft] = useState("");
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const PAGE_SIZE = 30;
 
   // Load conversations + realtime
   useEffect(() => {
     if (!businessId) return;
     let cancelled = false;
-    const fetchConvs = async () => {
+    const fetchConvs = async (initial = false) => {
+      if (initial) setConvLoading(true);
       const { data, error } = await supabase
         .from("conversations")
         .select("id,contact_id,last_message_at,last_message_preview,last_direction,unread_count,contact:contacts!inner(id,name,phone)")
         .eq("business_id", businessId)
         .order("last_message_at", { ascending: false });
       if (cancelled) return;
-      if (error) { toast.error(error.message); return; }
+      if (error) { toast.error(error.message); setConvLoading(false); return; }
       setConversations((data as unknown as Conversation[]) ?? []);
+      if (initial) setConvLoading(false);
     };
-    fetchConvs();
+    fetchConvs(true);
 
     const ch = supabase
       .channel(`conv-${businessId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversations", filter: `business_id=eq.${businessId}` },
-        () => { fetchConvs(); },
+        () => { fetchConvs(false); },
       )
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(ch); };
@@ -130,17 +168,24 @@ function ConversationsPage() {
 
   // Load messages for active conversation + realtime + mark read
   useEffect(() => {
-    if (!active) { setMessages([]); return; }
+    if (!active) { setMessages([]); setHasMoreOlder(false); return; }
     let cancelled = false;
+    setMsgLoading(true);
+    setHasMoreOlder(true);
+    // Fetch most recent PAGE_SIZE messages
     supabase
       .from("messages")
       .select("*")
       .eq("conversation_id", active.id)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE)
       .then(({ data, error }) => {
         if (cancelled) return;
+        setMsgLoading(false);
         if (error) { toast.error(error.message); return; }
-        setMessages((data ?? []) as Message[]);
+        const list = ((data ?? []) as Message[]).slice().reverse();
+        setMessages(list);
+        if ((data?.length ?? 0) < PAGE_SIZE) setHasMoreOlder(false);
       });
 
     // Reset unread
@@ -156,7 +201,6 @@ function ConversationsPage() {
         (payload) => {
           const m = payload.new as Message;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-          // keep unread cleared while viewing
           supabase.from("conversations").update({ unread_count: 0 }).eq("id", active.id).then(() => {});
         },
       )
@@ -165,8 +209,38 @@ function ConversationsPage() {
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [active?.id]);
 
+  const loadOlderMessages = async () => {
+    if (!active || loadingOlder || !hasMoreOlder || messages.length === 0) return;
+    setLoadingOlder(true);
+    const scrollEl = scrollRef.current;
+    const prevHeight = scrollEl?.scrollHeight ?? 0;
+    const oldest = messages[0].created_at;
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", active.id)
+      .lt("created_at", oldest)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
+    setLoadingOlder(false);
+    if (error) { toast.error(error.message); return; }
+    const older = ((data ?? []) as Message[]).slice().reverse();
+    if (older.length === 0) { setHasMoreOlder(false); return; }
+    if (older.length < PAGE_SIZE) setHasMoreOlder(false);
+    setMessages((prev) => [...older, ...prev]);
+    // Preserve scroll position
+    requestAnimationFrame(() => {
+      if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight - prevHeight;
+    });
+  };
+
+  const lastMsgIdRef = useRef<string | null>(null);
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    if (lastId !== lastMsgIdRef.current) {
+      lastMsgIdRef.current = lastId;
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
   }, [messages]);
 
   const filtered = useMemo(() => {
@@ -275,12 +349,19 @@ function ConversationsPage() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">
-              {conversations.length === 0
-                ? "No conversations yet. Incoming WhatsApp messages create them automatically, or add a contact."
-                : "No matches."}
-            </p>
+          {convLoading ? (
+            <>
+              {Array.from({ length: 6 }).map((_, i) => <ConvSkeleton key={i} />)}
+            </>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 p-8 text-center text-sm text-muted-foreground">
+              <MessageCircle className="h-8 w-8 opacity-40" />
+              <p>
+                {conversations.length === 0
+                  ? "No conversations yet. Incoming messages will appear here."
+                  : "No matches for your search."}
+              </p>
+            </div>
           ) : (
             filtered.map((c) => {
               const isActive = c.id === activeId;
@@ -289,7 +370,7 @@ function ConversationsPage() {
                 <button
                   key={c.id}
                   onClick={() => setActiveId(c.id)}
-                  className={`flex w-full items-start gap-3 border-b px-4 py-3 text-left transition ${
+                  className={`flex w-full items-start gap-3 border-b px-4 py-3 text-left transition-colors duration-150 ${
                     isActive ? "bg-accent" : "hover:bg-muted"
                   }`}
                 >
@@ -353,32 +434,67 @@ function ConversationsPage() {
             </header>
 
             <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto scroll-smooth px-4 py-6">
-              {messages.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground">No messages yet. Send the first one.</p>
+              {msgLoading ? (
+                <div className="space-y-3">
+                  <MsgSkeleton />
+                  <MsgSkeleton out />
+                  <MsgSkeleton />
+                  <MsgSkeleton out />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                  <MessageCircle className="h-8 w-8 opacity-40" />
+                  <p>No messages yet. Send the first one.</p>
+                </div>
               ) : (
-                messages.map((m) => {
-                  const out = m.direction === "outbound";
-                  return (
-                    <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className="max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm"
-                        style={{
-                          backgroundColor: out ? "var(--bubble-out)" : "var(--bubble-in)",
-                          borderTopRightRadius: out ? 4 : undefined,
-                          borderTopLeftRadius: !out ? 4 : undefined,
-                        }}
+                <>
+                  {hasMoreOlder && (
+                    <div className="flex justify-center pb-2">
+                      <button
+                        type="button"
+                        onClick={loadOlderMessages}
+                        disabled={loadingOlder}
+                        className="rounded-full bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
                       >
-                        <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                        <div className="mt-1 flex items-center justify-between gap-2">
-                          <ChannelBadge channel={m.channel ?? "manual"} />
-                          <p className="text-[10px] opacity-60">
-                            {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </p>
+                        {loadingOlder ? "Loading…" : "Load older messages"}
+                      </button>
+                    </div>
+                  )}
+                  {messages.map((m, i) => {
+                    const out = m.direction === "outbound";
+                    const prev = messages[i - 1];
+                    const showDate = !prev || dateLabel(prev.created_at) !== dateLabel(m.created_at);
+                    return (
+                      <div key={m.id}>
+                        {showDate && (
+                          <div className="my-3 flex justify-center">
+                            <span className="rounded-full bg-card/80 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
+                              {dateLabel(m.created_at)}
+                            </span>
+                          </div>
+                        )}
+                        <div className={`flex ${out ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
+                          <div
+                            className="max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm"
+                            style={{
+                              backgroundColor: out ? "var(--bubble-out)" : "var(--bubble-in)",
+                              borderTopRightRadius: out ? 4 : undefined,
+                              borderTopLeftRadius: !out ? 4 : undefined,
+                            }}
+                          >
+                            <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                            <div className="mt-1 flex items-center justify-between gap-2">
+                              <ChannelBadge channel={m.channel ?? "manual"} />
+                              <p className="text-[10px] opacity-60">
+                                {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </>
               )}
             </div>
 
