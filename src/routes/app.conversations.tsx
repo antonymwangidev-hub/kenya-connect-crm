@@ -429,32 +429,67 @@ function ConversationsPage() {
             </header>
 
             <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto scroll-smooth px-4 py-6">
-              {messages.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground">No messages yet. Send the first one.</p>
+              {msgLoading ? (
+                <div className="space-y-3">
+                  <MsgSkeleton />
+                  <MsgSkeleton out />
+                  <MsgSkeleton />
+                  <MsgSkeleton out />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                  <MessageCircle className="h-8 w-8 opacity-40" />
+                  <p>No messages yet. Send the first one.</p>
+                </div>
               ) : (
-                messages.map((m) => {
-                  const out = m.direction === "outbound";
-                  return (
-                    <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className="max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm"
-                        style={{
-                          backgroundColor: out ? "var(--bubble-out)" : "var(--bubble-in)",
-                          borderTopRightRadius: out ? 4 : undefined,
-                          borderTopLeftRadius: !out ? 4 : undefined,
-                        }}
+                <>
+                  {hasMoreOlder && (
+                    <div className="flex justify-center pb-2">
+                      <button
+                        type="button"
+                        onClick={loadOlderMessages}
+                        disabled={loadingOlder}
+                        className="rounded-full bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
                       >
-                        <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                        <div className="mt-1 flex items-center justify-between gap-2">
-                          <ChannelBadge channel={m.channel ?? "manual"} />
-                          <p className="text-[10px] opacity-60">
-                            {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </p>
+                        {loadingOlder ? "Loading…" : "Load older messages"}
+                      </button>
+                    </div>
+                  )}
+                  {messages.map((m, i) => {
+                    const out = m.direction === "outbound";
+                    const prev = messages[i - 1];
+                    const showDate = !prev || dateLabel(prev.created_at) !== dateLabel(m.created_at);
+                    return (
+                      <div key={m.id}>
+                        {showDate && (
+                          <div className="my-3 flex justify-center">
+                            <span className="rounded-full bg-card/80 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
+                              {dateLabel(m.created_at)}
+                            </span>
+                          </div>
+                        )}
+                        <div className={`flex ${out ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
+                          <div
+                            className="max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm"
+                            style={{
+                              backgroundColor: out ? "var(--bubble-out)" : "var(--bubble-in)",
+                              borderTopRightRadius: out ? 4 : undefined,
+                              borderTopLeftRadius: !out ? 4 : undefined,
+                            }}
+                          >
+                            <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                            <div className="mt-1 flex items-center justify-between gap-2">
+                              <ChannelBadge channel={m.channel ?? "manual"} />
+                              <p className="text-[10px] opacity-60">
+                                {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </>
               )}
             </div>
 
