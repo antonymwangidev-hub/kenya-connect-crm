@@ -414,11 +414,22 @@ function ConversationsPage() {
                   size="sm"
                   variant="outline"
                   className="ml-auto h-7 gap-1 text-xs"
-                  disabled={generating}
-                  onClick={generateFollowUp}
+                  disabled={generating || sending}
+                  onClick={() => generateFollowUp(false)}
                 >
                   <Wand2 className="h-3 w-3" />
                   {generating ? "Generating…" : "AI Follow-up"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  disabled={generating || sending}
+                  onClick={() => generateFollowUp(true)}
+                  title="Generate and send immediately"
+                >
+                  <Send className="h-3 w-3" />
+                  Send AI
                 </Button>
               </div>
               <div className="flex gap-2">
