@@ -87,14 +87,17 @@ function ConversationsPage() {
   const [suggesting, setSuggesting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [tone, setTone] = useState<Tone>("polite");
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<Conversation[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[] | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
   const [draft, setDraft] = useState("");
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const PAGE_SIZE = 30;
 
   // Load conversations + realtime
   useEffect(() => {
