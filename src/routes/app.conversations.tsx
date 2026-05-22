@@ -215,17 +215,36 @@ function ConversationsPage() {
     }
   };
 
-  const generateFollowUp = async () => {
+  const generateFollowUp = async (autoSend = false) => {
     if (!active) return;
     setGenerating(true);
     try {
       const { suggestion } = await suggestFn({ data: { contactId: active.contact_id, tone } });
-      if (suggestion) {
+      if (!suggestion) {
+        toast.error("No suggestion returned");
+        return;
+      }
+      if (autoSend) {
+        setSending(true);
+        try {
+          const result = await sendFn({ data: { contactId: active.contact_id, content: suggestion } });
+          toast.success(`Follow-up sent via ${result.channel}`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Send failed";
+          toast.error(msg);
+          await supabase.from("messages").insert({
+            contact_id: active.contact_id,
+            direction: "outbound",
+            content: suggestion,
+            channel: "manual",
+          });
+        } finally {
+          setSending(false);
+        }
+      } else {
         setDraft(suggestion);
         setDirection("outbound");
         toast.success("Follow-up ready — review and send");
-      } else {
-        toast.error("No suggestion returned");
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "AI failed");
