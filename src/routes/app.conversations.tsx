@@ -215,17 +215,36 @@ function ConversationsPage() {
     }
   };
 
-  const generateFollowUp = async () => {
+  const generateFollowUp = async (autoSend = false) => {
     if (!active) return;
     setGenerating(true);
     try {
       const { suggestion } = await suggestFn({ data: { contactId: active.contact_id, tone } });
-      if (suggestion) {
+      if (!suggestion) {
+        toast.error("No suggestion returned");
+        return;
+      }
+      if (autoSend) {
+        setSending(true);
+        try {
+          const result = await sendFn({ data: { contactId: active.contact_id, content: suggestion } });
+          toast.success(`Follow-up sent via ${result.channel}`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Send failed";
+          toast.error(msg);
+          await supabase.from("messages").insert({
+            contact_id: active.contact_id,
+            direction: "outbound",
+            content: suggestion,
+            channel: "manual",
+          });
+        } finally {
+          setSending(false);
+        }
+      } else {
         setDraft(suggestion);
         setDirection("outbound");
         toast.success("Follow-up ready — review and send");
-      } else {
-        toast.error("No suggestion returned");
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "AI failed");
@@ -395,11 +414,22 @@ function ConversationsPage() {
                   size="sm"
                   variant="outline"
                   className="ml-auto h-7 gap-1 text-xs"
-                  disabled={generating}
-                  onClick={generateFollowUp}
+                  disabled={generating || sending}
+                  onClick={() => generateFollowUp(false)}
                 >
                   <Wand2 className="h-3 w-3" />
                   {generating ? "Generating…" : "AI Follow-up"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  disabled={generating || sending}
+                  onClick={() => generateFollowUp(true)}
+                  title="Generate and send immediately"
+                >
+                  <Send className="h-3 w-3" />
+                  Send AI
                 </Button>
               </div>
               <div className="flex gap-2">

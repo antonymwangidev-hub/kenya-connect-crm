@@ -276,7 +276,15 @@ export type Database = {
           last_message_preview?: string | null
           unread_count?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
