@@ -105,24 +105,26 @@ function ConversationsPage() {
   useEffect(() => {
     if (!businessId) return;
     let cancelled = false;
-    const fetchConvs = async () => {
+    const fetchConvs = async (initial = false) => {
+      if (initial) setConvLoading(true);
       const { data, error } = await supabase
         .from("conversations")
         .select("id,contact_id,last_message_at,last_message_preview,last_direction,unread_count,contact:contacts!inner(id,name,phone)")
         .eq("business_id", businessId)
         .order("last_message_at", { ascending: false });
       if (cancelled) return;
-      if (error) { toast.error(error.message); return; }
+      if (error) { toast.error(error.message); setConvLoading(false); return; }
       setConversations((data as unknown as Conversation[]) ?? []);
+      if (initial) setConvLoading(false);
     };
-    fetchConvs();
+    fetchConvs(true);
 
     const ch = supabase
       .channel(`conv-${businessId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversations", filter: `business_id=eq.${businessId}` },
-        () => { fetchConvs(); },
+        () => { fetchConvs(false); },
       )
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(ch); };
