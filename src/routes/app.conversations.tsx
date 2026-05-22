@@ -137,17 +137,24 @@ function ConversationsPage() {
 
   // Load messages for active conversation + realtime + mark read
   useEffect(() => {
-    if (!active) { setMessages([]); return; }
+    if (!active) { setMessages([]); setHasMoreOlder(false); return; }
     let cancelled = false;
+    setMsgLoading(true);
+    setHasMoreOlder(true);
+    // Fetch most recent PAGE_SIZE messages
     supabase
       .from("messages")
       .select("*")
       .eq("conversation_id", active.id)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE)
       .then(({ data, error }) => {
         if (cancelled) return;
+        setMsgLoading(false);
         if (error) { toast.error(error.message); return; }
-        setMessages((data ?? []) as Message[]);
+        const list = ((data ?? []) as Message[]).slice().reverse();
+        setMessages(list);
+        if ((data?.length ?? 0) < PAGE_SIZE) setHasMoreOlder(false);
       });
 
     // Reset unread
@@ -163,7 +170,6 @@ function ConversationsPage() {
         (payload) => {
           const m = payload.new as Message;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-          // keep unread cleared while viewing
           supabase.from("conversations").update({ unread_count: 0 }).eq("id", active.id).then(() => {});
         },
       )
@@ -171,6 +177,31 @@ function ConversationsPage() {
 
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [active?.id]);
+
+  const loadOlderMessages = async () => {
+    if (!active || loadingOlder || !hasMoreOlder || messages.length === 0) return;
+    setLoadingOlder(true);
+    const scrollEl = scrollRef.current;
+    const prevHeight = scrollEl?.scrollHeight ?? 0;
+    const oldest = messages[0].created_at;
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", active.id)
+      .lt("created_at", oldest)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
+    setLoadingOlder(false);
+    if (error) { toast.error(error.message); return; }
+    const older = ((data ?? []) as Message[]).slice().reverse();
+    if (older.length === 0) { setHasMoreOlder(false); return; }
+    if (older.length < PAGE_SIZE) setHasMoreOlder(false);
+    setMessages((prev) => [...older, ...prev]);
+    // Preserve scroll position
+    requestAnimationFrame(() => {
+      if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight - prevHeight;
+    });
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
