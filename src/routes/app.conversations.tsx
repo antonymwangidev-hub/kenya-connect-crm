@@ -80,6 +80,37 @@ function timeAgo(iso: string) {
   return d.toLocaleDateString();
 }
 
+function dateLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (sameDay(d, today)) return "Today";
+  if (sameDay(d, yest)) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function ConvSkeleton() {
+  return (
+    <div className="flex animate-pulse items-start gap-3 border-b px-4 py-3">
+      <div className="h-10 w-10 shrink-0 rounded-full bg-muted" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 w-1/2 rounded bg-muted" />
+        <div className="h-3 w-3/4 rounded bg-muted/70" />
+      </div>
+    </div>
+  );
+}
+
+function MsgSkeleton({ out }: { out?: boolean }) {
+  return (
+    <div className={`flex ${out ? "justify-end" : "justify-start"} animate-pulse`}>
+      <div className="h-10 w-40 max-w-[60%] rounded-2xl bg-muted/60" />
+    </div>
+  );
+}
+
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
