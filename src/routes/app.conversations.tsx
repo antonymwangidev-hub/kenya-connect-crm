@@ -344,12 +344,19 @@ function ConversationsPage() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">
-              {conversations.length === 0
-                ? "No conversations yet. Incoming WhatsApp messages create them automatically, or add a contact."
-                : "No matches."}
-            </p>
+          {convLoading ? (
+            <>
+              {Array.from({ length: 6 }).map((_, i) => <ConvSkeleton key={i} />)}
+            </>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 p-8 text-center text-sm text-muted-foreground">
+              <MessageCircle className="h-8 w-8 opacity-40" />
+              <p>
+                {conversations.length === 0
+                  ? "No conversations yet. Incoming messages will appear here."
+                  : "No matches for your search."}
+              </p>
+            </div>
           ) : (
             filtered.map((c) => {
               const isActive = c.id === activeId;
@@ -358,7 +365,7 @@ function ConversationsPage() {
                 <button
                   key={c.id}
                   onClick={() => setActiveId(c.id)}
-                  className={`flex w-full items-start gap-3 border-b px-4 py-3 text-left transition ${
+                  className={`flex w-full items-start gap-3 border-b px-4 py-3 text-left transition-colors duration-150 ${
                     isActive ? "bg-accent" : "hover:bg-muted"
                   }`}
                 >
