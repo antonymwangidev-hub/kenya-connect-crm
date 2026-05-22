@@ -234,8 +234,13 @@ function ConversationsPage() {
     });
   };
 
+  const lastMsgIdRef = useRef<string | null>(null);
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    if (lastId !== lastMsgIdRef.current) {
+      lastMsgIdRef.current = lastId;
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
   }, [messages]);
 
   const filtered = useMemo(() => {
