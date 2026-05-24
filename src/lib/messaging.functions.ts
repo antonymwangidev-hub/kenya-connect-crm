@@ -1,61 +1,58 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// Sends a message via WhatsApp if configured, falls back to SMS via Twilio.
-// Logs everything to the messages table (and sms_logs for SMS attempts).
-async function sendWhatsApp(toPhone: string, content: string) {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  if (!token || !phoneNumberId) {
-    throw new Error("WhatsApp not configured");
-  }
-  const res = await fetch(
-    `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: toPhone.replace(/^\+/, ""),
-        type: "text",
-        text: { body: content },
-      }),
-    },
-  );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`WhatsApp API ${res.status}: ${body}`);
-  }
+// Reads per-business creds from channel_credentials (set in onboarding/Settings).
+// Falls back to env vars for backwards compatibility.
+
+async function getCreds(businessId: string, provider: "whatsapp" | "africastalking") {
+  const { data } = await supabaseAdmin
+    .from("channel_credentials").select("credentials,is_active")
+    .eq("business_id", businessId).eq("provider", provider).maybeSingle();
+  if (!data?.is_active) return null;
+  return data.credentials as Record<string, string>;
+}
+
+async function sendWhatsApp(businessId: string, toPhone: string, content: string) {
+  const c = await getCreds(businessId, "whatsapp");
+  const token = c?.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = c?.phone_number_id ?? process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!token || !phoneNumberId) throw new Error("WhatsApp not configured");
+  const res = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: toPhone.replace(/^\+/, ""),
+      type: "text",
+      text: { body: content },
+    }),
+  });
+  if (!res.ok) throw new Error(`WhatsApp API ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-async function sendTwilioSms(toPhone: string, content: string) {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const auth = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_FROM_NUMBER;
-  if (!sid || !auth || !from) {
-    throw new Error("Twilio not configured");
+async function sendAfricasTalking(businessId: string, toPhone: string, content: string) {
+  const c = await getCreds(businessId, "africastalking");
+  if (!c?.api_key || !c?.username) throw new Error("Africa's Talking not configured");
+  const body = new URLSearchParams({
+    username: c.username,
+    to: toPhone,
+    message: content,
+    ...(c.sender_id ? { from: c.sender_id } : {}),
+  });
+  const res = await fetch("https://api.africastalking.com/version1/messaging", {
+    method: "POST",
+    headers: { apiKey: c.api_key, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body,
+  });
+  const data = (await res.json()) as { SMSMessageData?: { Recipients?: Array<{ messageId?: string; status?: string }> } };
+  const rec = data.SMSMessageData?.Recipients?.[0];
+  if (!rec || (rec.status && !/success|sent/i.test(rec.status))) {
+    throw new Error(`Africa's Talking: ${rec?.status ?? "send failed"}`);
   }
-  const res = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${btoa(`${sid}:${auth}`)}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ To: toPhone, From: from, Body: content }),
-    },
-  );
-  const data = (await res.json()) as { sid?: string; message?: string };
-  if (!res.ok) {
-    throw new Error(`Twilio ${res.status}: ${data.message ?? "send failed"}`);
-  }
-  return data;
+  return { sid: rec.messageId };
 }
 
 export const sendOutboundMessage = createServerFn({ method: "POST" })
@@ -84,12 +81,12 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
 
     // Try WhatsApp first
     try {
-      await sendWhatsApp(contact.phone, data.content);
+      await sendWhatsApp(contact.business_id, contact.phone, data.content);
     } catch (err) {
       lastError = err instanceof Error ? err.message : "WhatsApp failed";
-      // Fallback to SMS
+      // Fallback to Africa's Talking SMS
       try {
-        const result = await sendTwilioSms(contact.phone, data.content);
+        const result = await sendAfricasTalking(contact.business_id, contact.phone, data.content);
         channel = "sms";
         await supabase.from("sms_logs").insert({
           business_id: contact.business_id,
