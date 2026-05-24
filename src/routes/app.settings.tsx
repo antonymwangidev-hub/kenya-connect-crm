@@ -14,17 +14,21 @@ export const Route = createFileRoute("/app/settings")({
 });
 
 type Cred = { id?: string; provider: "whatsapp" | "africastalking" | "mpesa"; credentials: Record<string, string>; is_active: boolean };
+type Biz = {
+  id?: string; name?: string; phone?: string | null; mpesa_type?: string | null; mpesa_number?: string | null;
+  default_greeting?: string | null; business_hours?: unknown; logo_url?: string | null;
+};
 
 function SettingsPage() {
   const { businessId, refreshBusiness } = useAuth();
-  const [biz, setBiz] = useState<Record<string, unknown> | null>(null);
+  const [biz, setBiz] = useState<Biz | null>(null);
   const [creds, setCreds] = useState<Record<string, Cred>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!businessId) return;
     supabase.from("businesses").select("*").eq("id", businessId).single()
-      .then(({ data }) => setBiz(data as Record<string, unknown>));
+      .then(({ data }) => setBiz((data as Biz) ?? null));
     supabase.from("channel_credentials").select("*").eq("business_id", businessId)
       .then(({ data }) => {
         const map: Record<string, Cred> = {};
@@ -33,12 +37,12 @@ function SettingsPage() {
       });
   }, [businessId]);
 
-  const updateBiz = (patch: Record<string, unknown>) => setBiz((b) => ({ ...(b ?? {}), ...patch }));
+  const updateBiz = (patch: Partial<Biz>) => setBiz((b) => ({ ...(b ?? {}), ...patch }));
   const setCred = (provider: "whatsapp" | "africastalking" | "mpesa", patch: Partial<Cred>) =>
-    setCreds((c) => ({
-      ...c,
-      [provider]: { provider, credentials: {}, is_active: false, ...(c[provider] ?? {}), ...patch },
-    }));
+    setCreds((c) => {
+      const existing: Cred = c[provider] ?? { provider, credentials: {}, is_active: false };
+      return { ...c, [provider]: { ...existing, ...patch } };
+    });
   const setCredField = (provider: "whatsapp" | "africastalking" | "mpesa", k: string, v: string) =>
     setCred(provider, { credentials: { ...(creds[provider]?.credentials ?? {}), [k]: v } });
 
@@ -47,8 +51,10 @@ function SettingsPage() {
     setSaving(true);
     try {
       const { error } = await supabase.from("businesses").update({
-        name: biz.name, phone: biz.phone, mpesa_type: biz.mpesa_type, mpesa_number: biz.mpesa_number,
-        default_greeting: biz.default_greeting, business_hours: biz.business_hours, logo_url: biz.logo_url,
+        name: biz.name ?? "", phone: biz.phone ?? null, mpesa_type: biz.mpesa_type ?? null, mpesa_number: biz.mpesa_number ?? null,
+        default_greeting: biz.default_greeting ?? null,
+        business_hours: (biz.business_hours ?? null) as never,
+        logo_url: biz.logo_url ?? null,
       }).eq("id", businessId);
       if (error) throw error;
       for (const provider of ["whatsapp", "africastalking", "mpesa"] as const) {
