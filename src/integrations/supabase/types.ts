@@ -161,22 +161,73 @@ export type Database = {
       }
       businesses: {
         Row: {
+          business_hours: Json | null
           created_at: string
+          default_greeting: string | null
           id: string
+          logo_url: string | null
+          mpesa_number: string | null
+          mpesa_type: string | null
           name: string
+          onboarded_at: string | null
           owner_id: string
+          phone: string | null
         }
         Insert: {
+          business_hours?: Json | null
           created_at?: string
+          default_greeting?: string | null
           id?: string
+          logo_url?: string | null
+          mpesa_number?: string | null
+          mpesa_type?: string | null
           name: string
+          onboarded_at?: string | null
           owner_id: string
+          phone?: string | null
         }
         Update: {
+          business_hours?: Json | null
           created_at?: string
+          default_greeting?: string | null
           id?: string
+          logo_url?: string | null
+          mpesa_number?: string | null
+          mpesa_type?: string | null
           name?: string
+          onboarded_at?: string | null
           owner_id?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      channel_credentials: {
+        Row: {
+          business_id: string
+          created_at: string
+          credentials: Json
+          id: string
+          is_active: boolean
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          credentials?: Json
+          id?: string
+          is_active?: boolean
+          provider: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          credentials?: Json
+          id?: string
+          is_active?: boolean
+          provider?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -245,8 +296,36 @@ export type Database = {
           },
         ]
       }
+      conversation_notes: {
+        Row: {
+          author_id: string
+          body: string
+          business_id: string
+          conversation_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          business_id: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          business_id?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
+          assigned_to: string | null
           business_id: string
           contact_id: string
           created_at: string
@@ -254,9 +333,11 @@ export type Database = {
           last_direction: string | null
           last_message_at: string
           last_message_preview: string | null
+          team: string | null
           unread_count: number
         }
         Insert: {
+          assigned_to?: string | null
           business_id: string
           contact_id: string
           created_at?: string
@@ -264,9 +345,11 @@ export type Database = {
           last_direction?: string | null
           last_message_at?: string
           last_message_preview?: string | null
+          team?: string | null
           unread_count?: number
         }
         Update: {
+          assigned_to?: string | null
           business_id?: string
           contact_id?: string
           created_at?: string
@@ -274,6 +357,7 @@ export type Database = {
           last_direction?: string | null
           last_message_at?: string
           last_message_preview?: string | null
+          team?: string | null
           unread_count?: number
         }
         Relationships: [
@@ -285,6 +369,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      message_templates: {
+        Row: {
+          body: string
+          business_id: string
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          body: string
+          business_id: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          body?: string
+          business_id?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       messages: {
         Row: {
@@ -323,6 +434,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reminders: {
+        Row: {
+          business_id: string
+          contact_id: string
+          created_at: string
+          created_by: string
+          due_at: string
+          id: string
+          note: string | null
+          status: string
+        }
+        Insert: {
+          business_id: string
+          contact_id: string
+          created_at?: string
+          created_by: string
+          due_at: string
+          id?: string
+          note?: string | null
+          status?: string
+        }
+        Update: {
+          business_id?: string
+          contact_id?: string
+          created_at?: string
+          created_by?: string
+          due_at?: string
+          id?: string
+          note?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       revenue_entries: {
         Row: {
@@ -431,8 +575,19 @@ export type Database = {
       owns_contact: { Args: { _contact_id: string }; Returns: boolean }
     }
     Enums: {
-      automation_action: "send_message" | "add_tag" | "notify_owner"
-      automation_trigger: "new_message" | "tag_added" | "time_delay"
+      automation_action:
+        | "send_message"
+        | "add_tag"
+        | "notify_owner"
+        | "send_template"
+      automation_trigger:
+        | "new_message"
+        | "tag_added"
+        | "time_delay"
+        | "keyword_match"
+        | "out_of_hours"
+        | "first_message"
+        | "reminder_due"
       contact_stage: "new" | "interested" | "negotiation" | "paid" | "lost"
       message_channel: "manual" | "whatsapp" | "sms"
       message_direction: "inbound" | "outbound"
@@ -563,8 +718,21 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      automation_action: ["send_message", "add_tag", "notify_owner"],
-      automation_trigger: ["new_message", "tag_added", "time_delay"],
+      automation_action: [
+        "send_message",
+        "add_tag",
+        "notify_owner",
+        "send_template",
+      ],
+      automation_trigger: [
+        "new_message",
+        "tag_added",
+        "time_delay",
+        "keyword_match",
+        "out_of_hours",
+        "first_message",
+        "reminder_due",
+      ],
       contact_stage: ["new", "interested", "negotiation", "paid", "lost"],
       message_channel: ["manual", "whatsapp", "sms"],
       message_direction: ["inbound", "outbound"],

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { MessageCircle, Users, Tags, LogOut, Zap, Megaphone, BarChart3, KanbanSquare, Sparkles, TrendingUp } from "lucide-react";
+import { MessageCircle, Users, Tags, LogOut, Zap, Megaphone, BarChart3, KanbanSquare, Sparkles, TrendingUp, FileText, Bell, Settings as SettingsIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/app")({
@@ -11,22 +11,31 @@ const nav = [
   { to: "/app/conversations", label: "Chats", icon: MessageCircle },
   { to: "/app/contacts", label: "Contacts", icon: Users },
   { to: "/app/pipeline", label: "Pipeline", icon: KanbanSquare },
+  { to: "/app/templates", label: "Templates", icon: FileText },
+  { to: "/app/reminders", label: "Reminders", icon: Bell },
   { to: "/app/insights", label: "AI Insights", icon: Sparkles },
   { to: "/app/performance", label: "Performance", icon: TrendingUp },
   { to: "/app/automations", label: "Automations", icon: Zap },
   { to: "/app/broadcasts", label: "Broadcasts", icon: Megaphone },
   { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/app/tags", label: "Tags", icon: Tags },
+  { to: "/app/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
 function AppLayout() {
-  const { user, loading, signOut, businessId } = useAuth();
+  const { user, loading, signOut, businessId, business } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/auth" });
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    if (business && !business.onboarded_at && pathname !== "/app/onboarding") {
+      navigate({ to: "/app/onboarding" });
+    }
+  }, [business, pathname, navigate]);
 
   if (loading || !user) {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;

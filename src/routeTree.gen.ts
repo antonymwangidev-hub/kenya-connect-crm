@@ -12,16 +12,22 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppTemplatesRouteImport } from './routes/app.templates'
 import { Route as AppTagsRouteImport } from './routes/app.tags'
+import { Route as AppSettingsRouteImport } from './routes/app.settings'
+import { Route as AppRemindersRouteImport } from './routes/app.reminders'
 import { Route as AppPipelineRouteImport } from './routes/app.pipeline'
 import { Route as AppPerformanceRouteImport } from './routes/app.performance'
+import { Route as AppOnboardingRouteImport } from './routes/app.onboarding'
 import { Route as AppInsightsRouteImport } from './routes/app.insights'
 import { Route as AppConversationsRouteImport } from './routes/app.conversations'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
 import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
 import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
+import { Route as ApiPublicRunRemindersRouteImport } from './routes/api/public/run-reminders'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
+import { Route as ApiPublicAtWebhookRouteImport } from './routes/api/public/at.webhook'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -38,9 +44,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppTemplatesRoute = AppTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTagsRoute = AppTagsRouteImport.update({
   id: '/tags',
   path: '/tags',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRemindersRoute = AppRemindersRouteImport.update({
+  id: '/reminders',
+  path: '/reminders',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPipelineRoute = AppPipelineRouteImport.update({
@@ -51,6 +72,11 @@ const AppPipelineRoute = AppPipelineRouteImport.update({
 const AppPerformanceRoute = AppPerformanceRouteImport.update({
   id: '/performance',
   path: '/performance',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOnboardingRoute = AppOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInsightsRoute = AppInsightsRouteImport.update({
@@ -83,12 +109,22 @@ const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicRunRemindersRoute = ApiPublicRunRemindersRouteImport.update({
+  id: '/api/public/run-reminders',
+  path: '/api/public/run-reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWhatsappWebhookRoute =
   ApiPublicWhatsappWebhookRouteImport.update({
     id: '/api/public/whatsapp/webhook',
     path: '/api/public/whatsapp/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAtWebhookRoute = ApiPublicAtWebhookRouteImport.update({
+  id: '/api/public/at/webhook',
+  path: '/api/public/at/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -100,9 +136,15 @@ export interface FileRoutesByFullPath {
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/onboarding': typeof AppOnboardingRoute
   '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
+  '/app/reminders': typeof AppRemindersRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/tags': typeof AppTagsRoute
+  '/app/templates': typeof AppTemplatesRoute
+  '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -115,9 +157,15 @@ export interface FileRoutesByTo {
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/onboarding': typeof AppOnboardingRoute
   '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
+  '/app/reminders': typeof AppRemindersRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/tags': typeof AppTagsRoute
+  '/app/templates': typeof AppTemplatesRoute
+  '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
@@ -131,9 +179,15 @@ export interface FileRoutesById {
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/onboarding': typeof AppOnboardingRoute
   '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
+  '/app/reminders': typeof AppRemindersRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/tags': typeof AppTagsRoute
+  '/app/templates': typeof AppTemplatesRoute
+  '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
@@ -148,9 +202,15 @@ export interface FileRouteTypes {
     | '/app/contacts'
     | '/app/conversations'
     | '/app/insights'
+    | '/app/onboarding'
     | '/app/performance'
     | '/app/pipeline'
+    | '/app/reminders'
+    | '/app/settings'
     | '/app/tags'
+    | '/app/templates'
+    | '/api/public/run-reminders'
+    | '/api/public/at/webhook'
     | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -163,9 +223,15 @@ export interface FileRouteTypes {
     | '/app/contacts'
     | '/app/conversations'
     | '/app/insights'
+    | '/app/onboarding'
     | '/app/performance'
     | '/app/pipeline'
+    | '/app/reminders'
+    | '/app/settings'
     | '/app/tags'
+    | '/app/templates'
+    | '/api/public/run-reminders'
+    | '/api/public/at/webhook'
     | '/api/public/whatsapp/webhook'
   id:
     | '__root__'
@@ -178,9 +244,15 @@ export interface FileRouteTypes {
     | '/app/contacts'
     | '/app/conversations'
     | '/app/insights'
+    | '/app/onboarding'
     | '/app/performance'
     | '/app/pipeline'
+    | '/app/reminders'
+    | '/app/settings'
     | '/app/tags'
+    | '/app/templates'
+    | '/api/public/run-reminders'
+    | '/api/public/at/webhook'
     | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -188,6 +260,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicRunRemindersRoute: typeof ApiPublicRunRemindersRoute
+  ApiPublicAtWebhookRoute: typeof ApiPublicAtWebhookRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
@@ -214,11 +288,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/templates': {
+      id: '/app/templates'
+      path: '/templates'
+      fullPath: '/app/templates'
+      preLoaderRoute: typeof AppTemplatesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/tags': {
       id: '/app/tags'
       path: '/tags'
       fullPath: '/app/tags'
       preLoaderRoute: typeof AppTagsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reminders': {
+      id: '/app/reminders'
+      path: '/reminders'
+      fullPath: '/app/reminders'
+      preLoaderRoute: typeof AppRemindersRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/pipeline': {
@@ -233,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/performance'
       fullPath: '/app/performance'
       preLoaderRoute: typeof AppPerformanceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/onboarding': {
+      id: '/app/onboarding'
+      path: '/onboarding'
+      fullPath: '/app/onboarding'
+      preLoaderRoute: typeof AppOnboardingRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/insights': {
@@ -277,11 +379,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/run-reminders': {
+      id: '/api/public/run-reminders'
+      path: '/api/public/run-reminders'
+      fullPath: '/api/public/run-reminders'
+      preLoaderRoute: typeof ApiPublicRunRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/whatsapp/webhook': {
       id: '/api/public/whatsapp/webhook'
       path: '/api/public/whatsapp/webhook'
       fullPath: '/api/public/whatsapp/webhook'
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/at/webhook': {
+      id: '/api/public/at/webhook'
+      path: '/api/public/at/webhook'
+      fullPath: '/api/public/at/webhook'
+      preLoaderRoute: typeof ApiPublicAtWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -294,9 +410,13 @@ interface AppRouteChildren {
   AppContactsRoute: typeof AppContactsRoute
   AppConversationsRoute: typeof AppConversationsRoute
   AppInsightsRoute: typeof AppInsightsRoute
+  AppOnboardingRoute: typeof AppOnboardingRoute
   AppPerformanceRoute: typeof AppPerformanceRoute
   AppPipelineRoute: typeof AppPipelineRoute
+  AppRemindersRoute: typeof AppRemindersRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppTagsRoute: typeof AppTagsRoute
+  AppTemplatesRoute: typeof AppTemplatesRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -306,9 +426,13 @@ const AppRouteChildren: AppRouteChildren = {
   AppContactsRoute: AppContactsRoute,
   AppConversationsRoute: AppConversationsRoute,
   AppInsightsRoute: AppInsightsRoute,
+  AppOnboardingRoute: AppOnboardingRoute,
   AppPerformanceRoute: AppPerformanceRoute,
   AppPipelineRoute: AppPipelineRoute,
+  AppRemindersRoute: AppRemindersRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppTagsRoute: AppTagsRoute,
+  AppTemplatesRoute: AppTemplatesRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -317,18 +441,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicRunRemindersRoute: ApiPublicRunRemindersRoute,
+  ApiPublicAtWebhookRoute: ApiPublicAtWebhookRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
