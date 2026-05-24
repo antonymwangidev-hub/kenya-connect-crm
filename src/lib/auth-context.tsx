@@ -2,10 +2,13 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+type Business = { id: string; name: string; onboarded_at: string | null; logo_url: string | null };
+
 type AuthCtx = {
   user: User | null;
   session: Session | null;
   businessId: string | null;
+  business: Business | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshBusiness: () => Promise<void>;
@@ -16,18 +19,18 @@ const Ctx = createContext<AuthCtx | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [businessId, setBusinessId] = useState<string | null>(null);
+  const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadBusiness = async (uid: string) => {
     const { data } = await supabase
       .from("businesses")
-      .select("id")
+      .select("id,name,onboarded_at,logo_url")
       .eq("owner_id", uid)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
-    setBusinessId(data?.id ?? null);
+    setBusiness((data as Business | null) ?? null);
   };
 
   useEffect(() => {
@@ -37,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s?.user) {
         setTimeout(() => loadBusiness(s.user.id), 0);
       } else {
-        setBusinessId(null);
+        setBusiness(null);
       }
     });
 
@@ -54,7 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthCtx = {
     user,
     session,
-    businessId,
+    businessId: business?.id ?? null,
+    business,
     loading,
     signOut: async () => { await supabase.auth.signOut(); },
     refreshBusiness: async () => { if (user) await loadBusiness(user.id); },
