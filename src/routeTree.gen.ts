@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppWhatsappRouteImport } from './routes/app.whatsapp'
 import { Route as AppTemplatesRouteImport } from './routes/app.templates'
 import { Route as AppTagsRouteImport } from './routes/app.tags'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
@@ -27,6 +28,7 @@ import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
 import { Route as ApiPublicRunRemindersRouteImport } from './routes/api/public/run-reminders'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
+import { Route as ApiPublicMpesaWebhookRouteImport } from './routes/api/public/mpesa.webhook'
 import { Route as ApiPublicAtWebhookRouteImport } from './routes/api/public/at.webhook'
 
 const AuthRoute = AuthRouteImport.update({
@@ -43,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppWhatsappRoute = AppWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppTemplatesRoute = AppTemplatesRouteImport.update({
   id: '/templates',
@@ -120,6 +127,11 @@ const ApiPublicWhatsappWebhookRoute =
     path: '/api/public/whatsapp/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicMpesaWebhookRoute = ApiPublicMpesaWebhookRouteImport.update({
+  id: '/api/public/mpesa/webhook',
+  path: '/api/public/mpesa/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicAtWebhookRoute = ApiPublicAtWebhookRouteImport.update({
   id: '/api/public/at/webhook',
   path: '/api/public/at/webhook',
@@ -143,8 +155,10 @@ export interface FileRoutesByFullPath {
   '/app/settings': typeof AppSettingsRoute
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
+  '/app/whatsapp': typeof AppWhatsappRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
+  '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -164,8 +178,10 @@ export interface FileRoutesByTo {
   '/app/settings': typeof AppSettingsRoute
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
+  '/app/whatsapp': typeof AppWhatsappRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
+  '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
@@ -186,8 +202,10 @@ export interface FileRoutesById {
   '/app/settings': typeof AppSettingsRoute
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
+  '/app/whatsapp': typeof AppWhatsappRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
+  '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
@@ -209,8 +227,10 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/tags'
     | '/app/templates'
+    | '/app/whatsapp'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
+    | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -230,8 +250,10 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/tags'
     | '/app/templates'
+    | '/app/whatsapp'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
+    | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
   id:
     | '__root__'
@@ -251,8 +273,10 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/tags'
     | '/app/templates'
+    | '/app/whatsapp'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
+    | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -262,6 +286,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ApiPublicRunRemindersRoute: typeof ApiPublicRunRemindersRoute
   ApiPublicAtWebhookRoute: typeof ApiPublicAtWebhookRoute
+  ApiPublicMpesaWebhookRoute: typeof ApiPublicMpesaWebhookRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
@@ -287,6 +312,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/whatsapp': {
+      id: '/app/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/app/whatsapp'
+      preLoaderRoute: typeof AppWhatsappRouteImport
+      parentRoute: typeof AppRoute
     }
     '/app/templates': {
       id: '/app/templates'
@@ -393,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/mpesa/webhook': {
+      id: '/api/public/mpesa/webhook'
+      path: '/api/public/mpesa/webhook'
+      fullPath: '/api/public/mpesa/webhook'
+      preLoaderRoute: typeof ApiPublicMpesaWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/at/webhook': {
       id: '/api/public/at/webhook'
       path: '/api/public/at/webhook'
@@ -417,6 +456,7 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppTagsRoute: typeof AppTagsRoute
   AppTemplatesRoute: typeof AppTemplatesRoute
+  AppWhatsappRoute: typeof AppWhatsappRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -433,6 +473,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppTagsRoute: AppTagsRoute,
   AppTemplatesRoute: AppTemplatesRoute,
+  AppWhatsappRoute: AppWhatsappRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -443,18 +484,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ApiPublicRunRemindersRoute: ApiPublicRunRemindersRoute,
   ApiPublicAtWebhookRoute: ApiPublicAtWebhookRoute,
+  ApiPublicMpesaWebhookRoute: ApiPublicMpesaWebhookRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
