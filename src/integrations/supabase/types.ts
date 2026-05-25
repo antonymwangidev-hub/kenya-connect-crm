@@ -159,6 +159,48 @@ export type Database = {
         }
         Relationships: []
       }
+      business_verifications: {
+        Row: {
+          business_id: string
+          certificate_url: string | null
+          created_at: string
+          id: string
+          legal_name: string | null
+          notes: string | null
+          owner_id_url: string | null
+          status: string
+          submitted_at: string | null
+          suggested_display_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          certificate_url?: string | null
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          notes?: string | null
+          owner_id_url?: string | null
+          status?: string
+          submitted_at?: string | null
+          suggested_display_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          certificate_url?: string | null
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          notes?: string | null
+          owner_id_url?: string | null
+          status?: string
+          submitted_at?: string | null
+          suggested_display_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       businesses: {
         Row: {
           business_hours: Json | null
@@ -370,6 +412,33 @@ export type Database = {
           },
         ]
       }
+      message_delivery_logs: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          message_id: string
+          provider_status: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          message_id: string
+          provider_status?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          message_id?: string
+          provider_status?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       message_templates: {
         Row: {
           body: string
@@ -434,6 +503,81 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_sessions: {
+        Row: {
+          business_id: string
+          completed_at: string | null
+          created_at: string
+          data: Json
+          id: string
+          path: string | null
+          step: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          completed_at?: string | null
+          created_at?: string
+          data?: Json
+          id?: string
+          path?: string | null
+          step?: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          completed_at?: string | null
+          created_at?: string
+          data?: Json
+          id?: string
+          path?: string | null
+          step?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payment_transactions: {
+        Row: {
+          amount: number
+          business_id: string
+          created_at: string
+          currency: string
+          id: string
+          meta: Json
+          provider: string
+          provider_ref: string | null
+          purpose: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          business_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          meta?: Json
+          provider: string
+          provider_ref?: string | null
+          purpose: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          meta?: Json
+          provider?: string
+          provider_ref?: string | null
+          purpose?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       reminders: {
         Row: {
@@ -565,6 +709,126 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      virtual_numbers: {
+        Row: {
+          business_id: string | null
+          created_at: string
+          id: string
+          phone_number: string
+          price_kes: number
+          provider: string
+          provider_sub_account: string | null
+          purchased_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string
+          id?: string
+          phone_number: string
+          price_kes?: number
+          provider?: string
+          provider_sub_account?: string | null
+          purchased_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string
+          id?: string
+          phone_number?: string
+          price_kes?: number
+          provider?: string
+          provider_sub_account?: string | null
+          purchased_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      webhook_logs: {
+        Row: {
+          business_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          signature_ok: boolean
+          source: string
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          signature_ok?: boolean
+          source: string
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          signature_ok?: boolean
+          source?: string
+        }
+        Relationships: []
+      }
+      whatsapp_connections: {
+        Row: {
+          business_id: string
+          connected_at: string | null
+          created_at: string
+          disconnected_at: string | null
+          display_name: string | null
+          id: string
+          meta: Json
+          phone_number: string
+          phone_number_id: string | null
+          quality_rating: string | null
+          status: string
+          updated_at: string
+          waba_id: string | null
+        }
+        Insert: {
+          business_id: string
+          connected_at?: string | null
+          created_at?: string
+          disconnected_at?: string | null
+          display_name?: string | null
+          id?: string
+          meta?: Json
+          phone_number: string
+          phone_number_id?: string | null
+          quality_rating?: string | null
+          status?: string
+          updated_at?: string
+          waba_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          connected_at?: string | null
+          created_at?: string
+          disconnected_at?: string | null
+          display_name?: string | null
+          id?: string
+          meta?: Json
+          phone_number?: string
+          phone_number_id?: string | null
+          quality_rating?: string | null
+          status?: string
+          updated_at?: string
+          waba_id?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
