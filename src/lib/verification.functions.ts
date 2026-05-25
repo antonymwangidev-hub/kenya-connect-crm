@@ -28,6 +28,7 @@ export const submitVerification = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { data: biz } = await supabase.from("businesses").select("id").limit(1).single();
+    if (!biz) throw new Error("Business not found");
     const { data: row, error } = await supabase
       .from("business_verifications")
       .upsert(
