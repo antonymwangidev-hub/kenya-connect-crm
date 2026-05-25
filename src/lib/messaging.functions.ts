@@ -16,8 +16,18 @@ async function getCreds(businessId: string, provider: "whatsapp" | "africastalki
 
 async function sendWhatsApp(businessId: string, toPhone: string, content: string) {
   const c = await getCreds(businessId, "whatsapp");
+  // Prefer the live whatsapp_connections row, fall back to channel_credentials, then env.
+  const { data: conn } = await supabaseAdmin
+    .from("whatsapp_connections")
+    .select("phone_number_id")
+    .eq("business_id", businessId)
+    .eq("status", "connected")
+    .order("connected_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const token = c?.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = c?.phone_number_id ?? process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const phoneNumberId =
+    conn?.phone_number_id ?? c?.phone_number_id ?? process.env.WHATSAPP_PHONE_NUMBER_ID;
   if (!token || !phoneNumberId) throw new Error("WhatsApp not configured");
   const res = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
     method: "POST",
