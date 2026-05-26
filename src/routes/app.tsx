@@ -20,6 +20,7 @@ const nav = [
   { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/app/tags", label: "Tags", icon: Tags },
   { to: "/app/whatsapp", label: "WhatsApp", icon: Smartphone },
+  { to: "/app/logs", label: "Logs", icon: Activity },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
