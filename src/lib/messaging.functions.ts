@@ -45,16 +45,19 @@ async function sendWhatsApp(businessId: string, toPhone: string, content: string
 
 async function sendAfricasTalking(businessId: string, toPhone: string, content: string) {
   const c = await getCreds(businessId, "africastalking");
-  if (!c?.api_key || !c?.username) throw new Error("Africa's Talking not configured");
+  const apiKey = c?.api_key ?? process.env.AFRICASTALKING_API_KEY;
+  const username = c?.username ?? process.env.AFRICASTALKING_USERNAME;
+  const senderId = c?.sender_id ?? process.env.AFRICASTALKING_SENDER_ID;
+  if (!apiKey || !username) throw new Error("Africa's Talking not configured");
   const body = new URLSearchParams({
-    username: c.username,
+    username,
     to: toPhone,
     message: content,
-    ...(c.sender_id ? { from: c.sender_id } : {}),
+    ...(senderId ? { from: senderId } : {}),
   });
   const res = await fetch("https://api.africastalking.com/version1/messaging", {
     method: "POST",
-    headers: { apiKey: c.api_key, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    headers: { apiKey, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body,
   });
   const data = (await res.json()) as { SMSMessageData?: { Recipients?: Array<{ messageId?: string; status?: string }> } };
@@ -64,6 +67,7 @@ async function sendAfricasTalking(businessId: string, toPhone: string, content: 
   }
   return { sid: rec.messageId };
 }
+
 
 export const sendOutboundMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
