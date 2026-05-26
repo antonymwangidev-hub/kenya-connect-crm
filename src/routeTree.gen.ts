@@ -20,6 +20,7 @@ import { Route as AppRemindersRouteImport } from './routes/app.reminders'
 import { Route as AppPipelineRouteImport } from './routes/app.pipeline'
 import { Route as AppPerformanceRouteImport } from './routes/app.performance'
 import { Route as AppOnboardingRouteImport } from './routes/app.onboarding'
+import { Route as AppLogsRouteImport } from './routes/app.logs'
 import { Route as AppInsightsRouteImport } from './routes/app.insights'
 import { Route as AppConversationsRouteImport } from './routes/app.conversations'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
@@ -86,6 +87,11 @@ const AppOnboardingRoute = AppOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AppRoute,
 } as any)
+const AppLogsRoute = AppLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppInsightsRoute = AppInsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
@@ -171,6 +178,7 @@ export interface FileRoutesByTo {
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
   '/app/insights': typeof AppInsightsRoute
+  '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/performance': typeof AppPerformanceRoute
   '/app/pipeline': typeof AppPipelineRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/app/contacts'
     | '/app/conversations'
     | '/app/insights'
+    | '/app/logs'
     | '/app/onboarding'
     | '/app/performance'
     | '/app/pipeline'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/app/contacts'
     | '/app/conversations'
     | '/app/insights'
+    | '/app/logs'
     | '/app/onboarding'
     | '/app/performance'
     | '/app/pipeline'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/app/contacts'
     | '/app/conversations'
     | '/app/insights'
+    | '/app/logs'
     | '/app/onboarding'
     | '/app/performance'
     | '/app/pipeline'
@@ -369,6 +381,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOnboardingRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/logs': {
+      id: '/app/logs'
+      path: '/logs'
+      fullPath: '/app/logs'
+      preLoaderRoute: typeof AppLogsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/insights': {
       id: '/app/insights'
       path: '/insights'
@@ -449,6 +468,7 @@ interface AppRouteChildren {
   AppContactsRoute: typeof AppContactsRoute
   AppConversationsRoute: typeof AppConversationsRoute
   AppInsightsRoute: typeof AppInsightsRoute
+  AppLogsRoute: typeof AppLogsRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
   AppPerformanceRoute: typeof AppPerformanceRoute
   AppPipelineRoute: typeof AppPipelineRoute
@@ -466,6 +486,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppContactsRoute: AppContactsRoute,
   AppConversationsRoute: AppConversationsRoute,
   AppInsightsRoute: AppInsightsRoute,
+  AppLogsRoute: AppLogsRoute,
   AppOnboardingRoute: AppOnboardingRoute,
   AppPerformanceRoute: AppPerformanceRoute,
   AppPipelineRoute: AppPipelineRoute,

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { MessageCircle, Users, Tags, LogOut, Zap, Megaphone, BarChart3, KanbanSquare, Sparkles, TrendingUp, FileText, Bell, Settings as SettingsIcon, Smartphone } from "lucide-react";
+import { MessageCircle, Users, Tags, LogOut, Zap, Megaphone, BarChart3, KanbanSquare, Sparkles, TrendingUp, FileText, Bell, Settings as SettingsIcon, Smartphone, Activity } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/app")({
@@ -20,6 +20,7 @@ const nav = [
   { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/app/tags", label: "Tags", icon: Tags },
   { to: "/app/whatsapp", label: "WhatsApp", icon: Smartphone },
+  { to: "/app/logs", label: "Logs", icon: Activity },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 

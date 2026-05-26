@@ -14,7 +14,7 @@ async function getCreds(businessId: string, provider: "whatsapp" | "africastalki
   return data.credentials as Record<string, string>;
 }
 
-async function sendWhatsApp(businessId: string, toPhone: string, content: string) {
+export async function sendWhatsApp(businessId: string, toPhone: string, content: string) {
   const c = await getCreds(businessId, "whatsapp");
   // Prefer the live whatsapp_connections row, fall back to channel_credentials, then env.
   const { data: conn } = await supabaseAdmin
@@ -43,7 +43,7 @@ async function sendWhatsApp(businessId: string, toPhone: string, content: string
   return res.json();
 }
 
-async function sendAfricasTalking(businessId: string, toPhone: string, content: string) {
+export async function sendAfricasTalking(businessId: string, toPhone: string, content: string) {
   const c = await getCreds(businessId, "africastalking");
   const apiKey = c?.api_key ?? process.env.AFRICASTALKING_API_KEY;
   const username = c?.username ?? process.env.AFRICASTALKING_USERNAME;
