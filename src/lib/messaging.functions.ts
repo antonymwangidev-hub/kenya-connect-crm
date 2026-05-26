@@ -43,7 +43,7 @@ export async function sendWhatsApp(businessId: string, toPhone: string, content:
   return res.json();
 }
 
-async function sendAfricasTalking(businessId: string, toPhone: string, content: string) {
+export async function sendAfricasTalking(businessId: string, toPhone: string, content: string) {
   const c = await getCreds(businessId, "africastalking");
   const apiKey = c?.api_key ?? process.env.AFRICASTALKING_API_KEY;
   const username = c?.username ?? process.env.AFRICASTALKING_USERNAME;
