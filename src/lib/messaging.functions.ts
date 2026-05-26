@@ -60,7 +60,16 @@ async function sendAfricasTalking(businessId: string, toPhone: string, content: 
     headers: { apiKey, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body,
   });
-  const data = (await res.json()) as { SMSMessageData?: { Recipients?: Array<{ messageId?: string; status?: string }> } };
+  const raw = await res.text();
+  if (!res.ok) {
+    throw new Error(`Africa's Talking ${res.status}: ${raw.slice(0, 200)}`);
+  }
+  let data: { SMSMessageData?: { Recipients?: Array<{ messageId?: string; status?: string }> } };
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error(`Africa's Talking returned non-JSON: ${raw.slice(0, 200)}`);
+  }
   const rec = data.SMSMessageData?.Recipients?.[0];
   if (!rec || (rec.status && !/success|sent/i.test(rec.status))) {
     throw new Error(`Africa's Talking: ${rec?.status ?? "send failed"}`);
