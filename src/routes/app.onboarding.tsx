@@ -412,18 +412,6 @@ function UseExistingFlow({
           Connect WhatsApp
         </PrimaryButton>
       </ButtonRow>
-      <p className="text-xs text-muted-foreground">
-        Prefer Meta onboarding?{" "}
-        <a
-          href="https://business.facebook.com/messaging/whatsapp/onboard/?app_id=350453511380084&config_id=2535413706843463&extras=%7B%22featureType%22%3A%22whatsapp_business_app_onboarding%22%2C%22sessionInfoVersion%22%3A%223%22%2C%22version%22%3A%22v3%22%2C%22features%22%3A%5B%7B%22name%22%3A%22marketing_messages_lite%22%7D%5D%7D"
-          target="_blank"
-          rel="noreferrer"
-          className="underline"
-        >
-          Continue in Facebook Business
-        </a>
-        .
-      </p>
     </Card>
   );
 }
