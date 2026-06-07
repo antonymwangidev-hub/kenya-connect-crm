@@ -66,15 +66,57 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
+const SECURITY_HEADERS: Record<string, string> = {
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=()",
+  "X-DNS-Prefetch-Control": "off",
+  // Conservative CSP. Allow self + https for assets/connect; keep inline styles/scripts
+  // for Tailwind + runtime SSR hydration. Frame-ancestors permits Lovable preview iframe.
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self' https://*.lovable.app https://*.lovable.dev",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https:",
+    "style-src 'self' 'unsafe-inline' https:",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+    "connect-src 'self' https: wss:",
+    "form-action 'self'",
+  ].join("; "),
+};
+
+function applySecurityHeaders(response: Response): Response {
+  let target = response;
+  try {
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+      if (!target.headers.has(k)) target.headers.set(k, v);
+    }
+    return target;
+  } catch {
+    target = new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+      if (!target.headers.has(k)) target.headers.set(k, v);
+    }
+    return target;
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return applySecurityHeaders(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return brandedErrorResponse();
+      return applySecurityHeaders(brandedErrorResponse());
     }
   },
 };
