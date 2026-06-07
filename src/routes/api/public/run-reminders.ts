@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 
 // Called hourly by pg_cron. Optionally protected by CRON_SECRET — when set,
 // callers must provide it via `x-cron-secret` header or `?token=` query.
