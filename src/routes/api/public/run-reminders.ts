@@ -28,6 +28,11 @@ export const Route = createFileRoute("/api/public/run-reminders")({
           });
         }
 
+        // Tight limit — this is an internal cron, not a public endpoint.
+        const ip = clientIp(request);
+        const allowed = await checkRateLimit("run_reminders", ip, 10, 60);
+        if (!allowed) return tooManyRequests();
+
         try {
           const now = new Date().toISOString();
           const { data: due, error } = await supabaseAdmin
