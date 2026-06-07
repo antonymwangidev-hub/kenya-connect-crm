@@ -73,7 +73,7 @@ export const Route = createFileRoute("/api/public/mpesa/webhook")({
         try {
           await supabaseAdmin.from("webhook_logs").insert({
             source: "mpesa",
-            payload: parsed as Record<string, unknown>,
+            payload: parsed as never,
             signature_ok: result.success,
             error: result.success ? null : result.error.issues[0]?.message?.slice(0, 200) ?? "schema_error",
             processed_at: new Date().toISOString(),
@@ -90,7 +90,7 @@ export const Route = createFileRoute("/api/public/mpesa/webhook")({
             .from("payment_transactions")
             .update({
               status: stk.ResultCode === 0 ? "success" : "failed",
-              meta: parsed as Record<string, unknown>,
+              meta: parsed as never,
             })
             .eq("provider_ref", stk.MerchantRequestID);
         } catch (e) {
