@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 
 // Called hourly by pg_cron. Optionally protected by CRON_SECRET — when set,
 // callers must provide it via `x-cron-secret` header or `?token=` query.
@@ -26,6 +27,11 @@ export const Route = createFileRoute("/api/public/run-reminders")({
             headers: { "Content-Type": "application/json" },
           });
         }
+
+        // Tight limit — this is an internal cron, not a public endpoint.
+        const ip = clientIp(request);
+        const allowed = await checkRateLimit("run_reminders", ip, 10, 60);
+        if (!allowed) return tooManyRequests();
 
         try {
           const now = new Date().toISOString();

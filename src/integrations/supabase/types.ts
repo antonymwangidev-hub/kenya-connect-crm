@@ -579,6 +579,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          bucket: string
+          count: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          key: string
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       reminders: {
         Row: {
           business_id: string
@@ -837,6 +858,15 @@ export type Database = {
     Functions: {
       owns_business: { Args: { _business_id: string }; Returns: boolean }
       owns_contact: { Args: { _contact_id: string }; Returns: boolean }
+      rate_limit_check: {
+        Args: {
+          _bucket: string
+          _key: string
+          _limit: number
+          _window_seconds: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       automation_action:

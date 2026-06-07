@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 
 // Meta WhatsApp Cloud API webhook.
 // Public URL example: https://<project>.lovable.app/api/public/whatsapp/webhook
@@ -71,6 +72,15 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
       },
 
       POST: async ({ request }) => {
+        const ip = clientIp(request);
+        const allowed = await checkRateLimit("whatsapp_webhook", ip, 240, 60);
+        if (!allowed) return tooManyRequests();
+
+        const contentLength = Number(request.headers.get("content-length") ?? "0");
+        if (contentLength > 65_536) {
+          return new Response("Payload too large", { status: 413 });
+        }
+
         const rawBody = await request.text();
         const sig = request.headers.get("x-hub-signature-256");
         if (!verifySignature(rawBody, sig)) {

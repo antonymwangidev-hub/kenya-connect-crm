@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 
 // Africa's Talking inbound SMS webhook.
 // AT posts application/x-www-form-urlencoded: from, to, text, date, id, linkId
@@ -16,6 +17,10 @@ export const Route = createFileRoute("/api/public/at/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const ip = clientIp(request);
+        const allowed = await checkRateLimit("at_webhook", ip, 120, 60);
+        if (!allowed) return tooManyRequests();
+
         const contentLength = Number(request.headers.get("content-length") ?? "0");
         if (contentLength > 8192) return new Response("ok");
 
