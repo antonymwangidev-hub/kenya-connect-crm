@@ -17,6 +17,10 @@ export const Route = createFileRoute("/api/public/at/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const ip = clientIp(request);
+        const allowed = await checkRateLimit("at_webhook", ip, 120, 60);
+        if (!allowed) return tooManyRequests();
+
         const contentLength = Number(request.headers.get("content-length") ?? "0");
         if (contentLength > 8192) return new Response("ok");
 
