@@ -3,18 +3,20 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // Virtual number provisioning server fns.
-// Backed by `virtual_numbers` + `payment_transactions`. The real M-Pesa STK
-// push + Africa's Talking number-provisioning calls fire once the master
-// account creds are saved in channel_credentials. Until then we simulate
-// success so the UX is end-to-end testable.
+// Reading the unassigned-number marketplace and reserving a number both need
+// to touch rows where business_id IS NULL. Per RLS, owners cannot see those
+// rows directly — we use the admin client server-side and project only the
+// safe columns. Sensitive fields (provider, provider_sub_account, etc.) never
+// leave the server.
 
 export const listAvailableNumbers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase } = context;
-    const { data } = await supabase
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
       .from("virtual_numbers")
       .select("id,phone_number,price_kes,status")
+      .is("business_id", null)
       .eq("status", "available")
       .order("phone_number")
       .limit(10);
@@ -32,17 +34,26 @@ export const reserveAndPayForNumber = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const { data: biz } = await supabase.from("businesses").select("id").limit(1).single();
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Resolve caller's business via the user-scoped client (RLS enforced).
+    const { data: biz } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("owner_id", userId)
+      .limit(1)
+      .single();
     if (!biz) throw new Error("Business not found");
 
-    // Reserve the number
-    const { data: number, error: nErr } = await supabase
+    // Atomically claim the available unassigned number using the admin client.
+    const { data: number, error: nErr } = await supabaseAdmin
       .from("virtual_numbers")
       .update({ status: "reserved", business_id: biz.id })
       .eq("id", data.numberId)
       .eq("status", "available")
-      .select()
+      .is("business_id", null)
+      .select("id,phone_number,price_kes,status,business_id")
       .single();
     if (nErr || !number) throw new Error("Number no longer available");
 
