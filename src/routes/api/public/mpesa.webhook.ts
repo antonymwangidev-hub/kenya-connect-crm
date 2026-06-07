@@ -34,6 +34,11 @@ export const Route = createFileRoute("/api/public/mpesa/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Rate limit: 120 req/min per IP — generous for legitimate Daraja retries.
+        const ip = clientIp(request);
+        const allowed = await checkRateLimit("mpesa_webhook", ip, 120, 60);
+        if (!allowed) return tooManyRequests();
+
         // Size guard — Daraja callbacks are small (<2KB typical).
         const contentLength = Number(request.headers.get("content-length") ?? "0");
         if (contentLength > 16_384) {
