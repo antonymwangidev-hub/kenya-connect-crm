@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 
 // Meta WhatsApp Cloud API webhook.
 // Public URL example: https://<project>.lovable.app/api/public/whatsapp/webhook
