@@ -132,8 +132,8 @@ function OnboardingPage() {
         data: {
           legalName,
           suggestedDisplayName: displayName,
-          certificateUrl: certUrl,
-          ownerIdUrl: idUrl,
+          certificatePath: certUrl,
+          ownerIdPath: idUrl,
         },
       });
       setStep(2);
