@@ -14,7 +14,7 @@ const searchSchema = z.object({
   error_description: z.string().optional(),
 });
 
-export const Route = createFileRoute("/app/whatsapp/callback")({
+export const Route = createFileRoute("/whatsapp/callback")({
   validateSearch: (s) => searchSchema.parse(s),
   component: WhatsappCallback,
 });
