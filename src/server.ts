@@ -84,6 +84,7 @@ const SECURITY_HEADERS: Record<string, string> = {
     "style-src 'self' 'unsafe-inline' https:",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
     "connect-src 'self' https: wss:",
+    "frame-src 'self' https:",
     "form-action 'self'",
   ].join("; "),
 };
