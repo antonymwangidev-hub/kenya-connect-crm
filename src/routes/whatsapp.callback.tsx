@@ -20,7 +20,7 @@ export const Route = createFileRoute("/whatsapp/callback")({
 });
 
 function WhatsappCallback() {
-  const { code, error, error_description } = useSearch({ from: "/app/whatsapp/callback" });
+  const { code, error, error_description } = useSearch({ from: "/whatsapp/callback" });
   const navigate = useNavigate();
   const exchange = useServerFn(exchangeWhatsappSignup);
   const ran = useRef(false);
