@@ -103,7 +103,7 @@ function OnboardingPage() {
     try {
       let logoUrl: string | undefined;
       if (logoFile) {
-        const url = await uploadTo(logoFile, "logo");
+        const url = await uploadLogo(logoFile);
         if (url) logoUrl = url;
       }
       const { error } = await supabase
