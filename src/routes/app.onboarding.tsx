@@ -189,8 +189,8 @@ function OnboardingPage() {
           setLegalName={setLegalName}
           displayName={displayName}
           setDisplayName={setDisplayName}
-          onCertUpload={async (f) => setCertUrl(await uploadTo(f, "cert"))}
-          onIdUpload={async (f) => setIdUrl(await uploadTo(f, "id"))}
+          onCertUpload={async (f) => setCertUrl(await uploadPrivateDoc(f, "cert"))}
+          onIdUpload={async (f) => setIdUrl(await uploadPrivateDoc(f, "id"))}
           certUrl={certUrl}
           idUrl={idUrl}
           onBack={() => setStep(0)}
