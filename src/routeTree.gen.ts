@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WhatsappCallbackRouteImport } from './routes/whatsapp.callback'
 import { Route as AppWhatsappRouteImport } from './routes/app.whatsapp'
 import { Route as AppTemplatesRouteImport } from './routes/app.templates'
 import { Route as AppTagsRouteImport } from './routes/app.tags'
@@ -45,6 +46,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WhatsappCallbackRoute = WhatsappCallbackRouteImport.update({
+  id: '/whatsapp/callback',
+  path: '/whatsapp/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppWhatsappRoute = AppWhatsappRouteImport.update({
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
   '/app/whatsapp': typeof AppWhatsappRoute
+  '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
   '/app/whatsapp': typeof AppWhatsappRoute
+  '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
   '/app/whatsapp': typeof AppWhatsappRoute
+  '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
@@ -238,6 +247,7 @@ export interface FileRouteTypes {
     | '/app/tags'
     | '/app/templates'
     | '/app/whatsapp'
+    | '/whatsapp/callback'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
@@ -262,6 +272,7 @@ export interface FileRouteTypes {
     | '/app/tags'
     | '/app/templates'
     | '/app/whatsapp'
+    | '/whatsapp/callback'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
@@ -286,6 +297,7 @@ export interface FileRouteTypes {
     | '/app/tags'
     | '/app/templates'
     | '/app/whatsapp'
+    | '/whatsapp/callback'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
@@ -296,6 +308,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
+  WhatsappCallbackRoute: typeof WhatsappCallbackRoute
   ApiPublicRunRemindersRoute: typeof ApiPublicRunRemindersRoute
   ApiPublicAtWebhookRoute: typeof ApiPublicAtWebhookRoute
   ApiPublicMpesaWebhookRoute: typeof ApiPublicMpesaWebhookRoute
@@ -323,6 +336,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/whatsapp/callback': {
+      id: '/whatsapp/callback'
+      path: '/whatsapp/callback'
+      fullPath: '/whatsapp/callback'
+      preLoaderRoute: typeof WhatsappCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/whatsapp': {
@@ -503,6 +523,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
+  WhatsappCallbackRoute: WhatsappCallbackRoute,
   ApiPublicRunRemindersRoute: ApiPublicRunRemindersRoute,
   ApiPublicAtWebhookRoute: ApiPublicAtWebhookRoute,
   ApiPublicMpesaWebhookRoute: ApiPublicMpesaWebhookRoute,
