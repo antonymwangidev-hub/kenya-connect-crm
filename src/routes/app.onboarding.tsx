@@ -73,13 +73,28 @@ function OnboardingPage() {
 
   const progress = ((step + 1) / STEPS.length) * 100;
 
-  const uploadTo = async (file: File, kind: string) => {
+  // Logos (non-sensitive) go to the public bucket and return a public URL.
+  const uploadLogo = async (file: File) => {
     if (!businessId) return null;
-    const path = `${businessId}/${kind}-${Date.now()}-${file.name}`;
+    const path = `${businessId}/logo-${Date.now()}-${file.name}`;
     const up = await supabase.storage.from("business-assets").upload(path, file, { upsert: true });
     if (up.error) throw up.error;
     const { data } = supabase.storage.from("business-assets").getPublicUrl(path);
     return data.publicUrl;
+  };
+
+  // Sensitive verification docs (cert / owner ID) go to a PRIVATE bucket via a
+  // short-lived signed upload URL. We only persist the storage path, never a public URL.
+  const createUploadUrlFn = useServerFn(createVerificationUploadUrl);
+  const uploadPrivateDoc = async (file: File, kind: "cert" | "id") => {
+    const { path, token } = await createUploadUrlFn({
+      data: { kind, filename: file.name },
+    });
+    const { error } = await supabase.storage
+      .from("business-verification-docs")
+      .uploadToSignedUrl(path, token, file, { upsert: true });
+    if (error) throw error;
+    return path;
   };
 
   const saveProfile = async () => {
