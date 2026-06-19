@@ -27,7 +27,10 @@ import {
   completeWhatsappConnection,
   getEmbeddedSignupConfig,
 } from "@/lib/whatsapp.functions";
-import { submitVerification } from "@/lib/verification.functions";
+import {
+  submitVerification,
+  createVerificationUploadUrl,
+} from "@/lib/verification.functions";
 import {
   listAvailableNumbers,
   reserveAndPayForNumber,
