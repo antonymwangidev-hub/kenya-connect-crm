@@ -135,11 +135,22 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   nameByWaId.get(from) ?? null,
                 );
 
+                const providerId: string | null = m?.id ?? null;
+                if (providerId) {
+                  const { data: dup } = await supabaseAdmin
+                    .from("messages")
+                    .select("id")
+                    .eq("provider_message_id", providerId)
+                    .maybeSingle();
+                  if (dup) continue;
+                }
+
                 await supabaseAdmin.from("messages").insert({
                   contact_id: contactId,
                   direction: "inbound",
                   content: text,
                   channel: "whatsapp",
+                  provider_message_id: providerId,
                 });
               }
             }
@@ -151,6 +162,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
 
         return new Response("ok", { status: 200 });
       },
+
     },
   },
 });
