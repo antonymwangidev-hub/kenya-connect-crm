@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { sendWhatsApp, sendAfricasTalking } from "@/lib/messaging.functions";
+
 
 // ---- Broadcast: send the same message to many contacts, with a small delay between sends ----
 export const sendBroadcast = createServerFn({ method: "POST" })
@@ -44,32 +46,45 @@ export const sendBroadcast = createServerFn({ method: "POST" })
 
     // Rate-limit: ~3 messages/sec
     for (const c of contacts) {
+      let channel: "whatsapp" | "sms" | "manual" = "manual";
+      let err: string | null = null;
       try {
+        try {
+          await sendWhatsApp(businessId, c.phone, data.content);
+          channel = "whatsapp";
+        } catch (waErr) {
+          // Fallback to SMS via Africa's Talking
+          await sendAfricasTalking(businessId, c.phone, data.content);
+          channel = "sms";
+        }
         await supabase.from("messages").insert({
           contact_id: c.id,
           direction: "outbound",
           content: data.content,
-          channel: "manual",
+          channel,
         });
         await supabase.from("broadcast_recipients").insert({
           broadcast_id: broadcast.id,
           contact_id: c.id,
           status: "sent",
-          channel: "manual",
+          channel,
           sent_at: new Date().toISOString(),
         });
         sent++;
-      } catch (err) {
+      } catch (e) {
+        err = e instanceof Error ? e.message : "send failed";
         failed++;
         await supabase.from("broadcast_recipients").insert({
           broadcast_id: broadcast.id,
           contact_id: c.id,
           status: "failed",
-          error: err instanceof Error ? err.message : "send failed",
+          error: err,
         });
       }
       await new Promise((r) => setTimeout(r, 300));
     }
+
+
 
     await supabase
       .from("broadcasts")

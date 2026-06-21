@@ -475,6 +475,7 @@ export type Database = {
           created_at: string
           direction: Database["public"]["Enums"]["message_direction"]
           id: string
+          provider_message_id: string | null
         }
         Insert: {
           channel?: Database["public"]["Enums"]["message_channel"]
@@ -484,6 +485,7 @@ export type Database = {
           created_at?: string
           direction: Database["public"]["Enums"]["message_direction"]
           id?: string
+          provider_message_id?: string | null
         }
         Update: {
           channel?: Database["public"]["Enums"]["message_channel"]
@@ -493,6 +495,7 @@ export type Database = {
           created_at?: string
           direction?: Database["public"]["Enums"]["message_direction"]
           id?: string
+          provider_message_id?: string | null
         }
         Relationships: [
           {

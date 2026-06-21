@@ -24,9 +24,19 @@ function verifySignature(rawBody: string, signatureHeader: string | null): boole
 }
 
 async function findBusinessForPhoneNumberId(phoneNumberId: string | undefined) {
-  // Multi-tenant routing: map the receiving business phone-number-id to a business.
-  // For the MVP we route everything to a single business: the env-configured one,
-  // or the first business if not set.
+  // Multi-tenant routing: map the receiving phone-number-id to a business via
+  // whatsapp_connections (populated by embedded signup or manual onboarding).
+  if (phoneNumberId) {
+    const { data } = await supabaseAdmin
+      .from("whatsapp_connections")
+      .select("business_id")
+      .eq("phone_number_id", phoneNumberId)
+      .order("connected_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data?.business_id) return data.business_id;
+  }
+  // Fallbacks for single-tenant / dev setups.
   const configured = process.env.WHATSAPP_DEFAULT_BUSINESS_ID;
   if (configured) return configured;
   const { data } = await supabaseAdmin
@@ -37,6 +47,7 @@ async function findBusinessForPhoneNumberId(phoneNumberId: string | undefined) {
     .maybeSingle();
   return data?.id ?? null;
 }
+
 
 async function upsertContact(businessId: string, phone: string, name: string | null) {
   const { data: existing } = await supabaseAdmin
@@ -124,11 +135,22 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   nameByWaId.get(from) ?? null,
                 );
 
+                const providerId: string | null = m?.id ?? null;
+                if (providerId) {
+                  const { data: dup } = await supabaseAdmin
+                    .from("messages")
+                    .select("id")
+                    .eq("provider_message_id", providerId)
+                    .maybeSingle();
+                  if (dup) continue;
+                }
+
                 await supabaseAdmin.from("messages").insert({
                   contact_id: contactId,
                   direction: "inbound",
                   content: text,
                   channel: "whatsapp",
+                  provider_message_id: providerId,
                 });
               }
             }
@@ -140,6 +162,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
 
         return new Response("ok", { status: 200 });
       },
+
     },
   },
 });
