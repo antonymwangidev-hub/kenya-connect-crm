@@ -40,6 +40,7 @@ interface WaMessage {
   timestamp: string;
   type: string;
   text?: { body: string };
+  button?: { text?: string };
   [key: string]: unknown;
 }
 
@@ -54,6 +55,13 @@ interface WaValue {
   contacts?: WaContactInfo[];
   statuses?: unknown[];
 }
+
+type BusinessLookup = {
+  businessId: string | null;
+  phoneNumberId: string | null;
+  source: "whatsapp_connections" | "channel_credentials" | "env" | "missing_phone_number_id" | "not_found";
+  attempts: Array<Record<string, unknown>>;
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -102,14 +110,29 @@ Deno.serve(async (req: Request) => {
             const value = change.value;
             if (!value?.messages?.length) continue; // status callbacks etc — nothing to store
 
-            const businessId = await resolveBusinessId(value.metadata?.phone_number_id);
-            if (!businessId) {
-              processingError = `No whatsapp_connections row for phone_number_id ${value.metadata?.phone_number_id}`;
-              continue;
-            }
+            const businessLookup = await resolveBusiness(value.metadata?.phone_number_id);
+            const businessId = businessLookup.businessId;
 
             for (const message of value.messages) {
-              await storeInboundMessage(businessId, message, value.contacts ?? []);
+              const trace = baseTrace(value, message, businessLookup);
+              if (!businessId) {
+                processingError = `No business matched phone_number_id ${value.metadata?.phone_number_id ?? "<missing>"}`;
+                trace.error = processingError;
+                console.warn("WhatsApp inbound routing failed:", JSON.stringify(trace));
+                await logWebhook(trace, signatureOk, processingError, null);
+                continue;
+              }
+
+              try {
+                await storeInboundMessage(businessId, message, value.contacts ?? [], trace);
+                console.info("WhatsApp inbound stored:", JSON.stringify(trace));
+                await logWebhook(trace, signatureOk, null, businessId);
+              } catch (err) {
+                processingError = err instanceof Error ? err.message : String(err);
+                trace.error = processingError;
+                console.error("WhatsApp inbound message failed:", JSON.stringify(trace), err);
+                await logWebhook(trace, signatureOk, processingError, businessId);
+              }
             }
           }
         }
@@ -119,7 +142,9 @@ Deno.serve(async (req: Request) => {
       console.error("whatsapp-webhook processing error:", err);
     }
 
-    await logWebhook(payload, signatureOk, processingError);
+    if (processingError || !hasInboundMessages(payload)) {
+      await logWebhook(payload, signatureOk, processingError, null);
+    }
 
     // Always 200 — Meta will retry-storm on non-2xx responses.
     return new Response(JSON.stringify({ status: "ok" }), {
@@ -131,65 +156,210 @@ Deno.serve(async (req: Request) => {
   return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
 });
 
-async function resolveBusinessId(phoneNumberId: string | undefined): Promise<string | null> {
-  if (!phoneNumberId) return null;
-  const { data, error } = await supabase
+function normalizeWaPhone(value: string): string {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits ? `+${digits}` : String(value ?? "").trim();
+}
+
+function hasInboundMessages(payload: { entry?: Array<{ changes?: Array<{ value?: WaValue }> }> }): boolean {
+  return (payload.entry ?? []).some((entry) =>
+    (entry.changes ?? []).some((change) => Boolean(change.value?.messages?.length)),
+  );
+}
+
+function baseTrace(value: WaValue, message: WaMessage, businessLookup: BusinessLookup): Record<string, unknown> {
+  const text = message.text?.body ?? message.button?.text ?? fallbackBody(message.type);
+  return {
+    event: "inbound_message",
+    phone_number_id: value.metadata?.phone_number_id ?? null,
+    display_phone_number: value.metadata?.display_phone_number ?? null,
+    sender_number: normalizeWaPhone(message.from),
+    message_text: text,
+    provider_message_id: message.id ?? null,
+    business_lookup: businessLookup,
+    contact_result: null,
+    conversation_lookup_result: null,
+    database_insert_result: null,
+    error: null,
+  };
+}
+
+async function resolveBusiness(phoneNumberId: string | undefined): Promise<BusinessLookup> {
+  const normalized = phoneNumberId?.trim() || null;
+  const attempts: BusinessLookup["attempts"] = [];
+  if (!normalized) return { businessId: null, phoneNumberId: null, source: "missing_phone_number_id", attempts };
+
+  const { data: connection, error } = await supabase
     .from("whatsapp_connections")
-    .select("business_id")
-    .eq("phone_number_id", phoneNumberId)
+    .select("business_id,status,connected_at")
+    .eq("phone_number_id", normalized)
+    .order("connected_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  if (error) {
-    console.error("Error resolving business from phone_number_id:", error);
-    return null;
+  attempts.push({
+    source: "whatsapp_connections",
+    ok: !error,
+    business_id: connection?.business_id ?? null,
+    status: connection?.status ?? null,
+    error: error?.message ?? null,
+  });
+  if (connection?.business_id) {
+    return { businessId: connection.business_id, phoneNumberId: normalized, source: "whatsapp_connections", attempts };
   }
-  return data?.business_id ?? null;
+
+  const { data: credentials, error: credentialError } = await supabase
+    .from("channel_credentials")
+    .select("business_id,credentials,is_active")
+    .eq("provider", "whatsapp")
+    .eq("is_active", true);
+  const credentialMatch = (credentials ?? []).find((row) => {
+    const creds = (row.credentials ?? {}) as Record<string, string>;
+    return String(creds.phone_number_id ?? "").trim() === normalized;
+  });
+  attempts.push({
+    source: "channel_credentials",
+    ok: !credentialError,
+    active_rows_checked: credentials?.length ?? 0,
+    business_id: credentialMatch?.business_id ?? null,
+    error: credentialError?.message ?? null,
+  });
+  if (credentialMatch?.business_id) {
+    return { businessId: credentialMatch.business_id, phoneNumberId: normalized, source: "channel_credentials", attempts };
+  }
+
+  const envPhoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")?.trim();
+  const envBusinessId = Deno.env.get("WHATSAPP_DEFAULT_BUSINESS_ID")?.trim();
+  const envMatches = Boolean(envPhoneNumberId && envBusinessId && envPhoneNumberId === normalized);
+  attempts.push({
+    source: "env",
+    ok: envMatches,
+    phone_number_id_matches: envPhoneNumberId ? envPhoneNumberId === normalized : false,
+    has_default_business_id: Boolean(envBusinessId),
+  });
+  if (envMatches) return { businessId: envBusinessId!, phoneNumberId: normalized, source: "env", attempts };
+
+  return { businessId: null, phoneNumberId: normalized, source: "not_found", attempts };
 }
 
 async function storeInboundMessage(
   businessId: string,
   message: WaMessage,
   contactsInfo: WaContactInfo[],
+  trace: Record<string, unknown>,
 ) {
-  const phone = message.from;
-  const profileName = contactsInfo.find((c) => c.wa_id === phone)?.profile?.name ?? phone;
-  const content = message.text?.body ?? fallbackBody(message.type);
+  const sender = message.from;
+  const phone = normalizeWaPhone(sender);
+  const phoneVariants = [...new Set([phone, phone.replace(/^\+/, "")])];
+  const profileName = contactsInfo.find((c) => c.wa_id === sender)?.profile?.name ?? phone;
+  const content = message.text?.body ?? message.button?.text ?? fallbackBody(message.type);
   const createdAt = new Date(Number(message.timestamp) * 1000).toISOString();
 
   // 1) Find or create the contact, scoped to this business.
-  const { data: contact, error: upsertError } = await supabase
+  let { data: contact, error: contactLookupError } = await supabase
     .from("contacts")
-    .upsert(
-      { business_id: businessId, phone, name: profileName },
-      { onConflict: "business_id,phone", ignoreDuplicates: false },
-    )
-    .select("id")
-    .single();
+    .select("id,phone")
+    .eq("business_id", businessId)
+    .in("phone", phoneVariants)
+    .limit(1)
+    .maybeSingle();
 
-  if (upsertError) {
-    console.error("Error upserting contact:", upsertError);
-    throw upsertError;
+  if (contactLookupError) {
+    console.error("Error looking up contact:", contactLookupError);
+    throw contactLookupError;
+  }
+
+  let contactCreated = false;
+  const matchedPhone = contact?.phone ?? null;
+  if (!contact) {
+    const { data: created, error: createError } = await supabase
+      .from("contacts")
+      .insert({ business_id: businessId, phone, name: profileName })
+      .select("id,phone")
+      .single();
+    if (createError) {
+      console.error("Error creating contact:", createError);
+      throw createError;
+    }
+    contact = created;
+    contactCreated = true;
+  } else if (contact.phone !== phone) {
+    const { error: updateError } = await supabase.from("contacts").update({ phone }).eq("id", contact.id);
+    if (updateError) console.warn("WhatsApp contact phone normalization failed:", updateError.message);
+  }
+
+  trace.contact_result = { id: contact.id, created: contactCreated, phone, matchedPhone };
+
+  const { data: conversation, error: conversationError } = await supabase
+    .from("conversations")
+    .select("id,business_id,contact_id,last_message_at,last_message_preview,last_direction,unread_count")
+    .eq("contact_id", contact.id)
+    .maybeSingle();
+  trace.conversation_lookup_result = {
+    found: Boolean(conversation),
+    conversation_id: conversation?.id ?? null,
+    business_id: conversation?.business_id ?? null,
+    unread_count: conversation?.unread_count ?? null,
+    error: conversationError?.message ?? null,
+  };
+  if (conversationError) throw conversationError;
+
+  if (message.id) {
+    const { data: duplicate, error: duplicateError } = await supabase
+      .from("messages")
+      .select("id,conversation_id,created_at")
+      .eq("provider_message_id", message.id)
+      .maybeSingle();
+    if (duplicateError) throw duplicateError;
+    if (duplicate) {
+      trace.database_insert_result = {
+        ok: true,
+        skipped_duplicate: true,
+        existing_message_id: duplicate.id,
+        conversation_id: duplicate.conversation_id,
+      };
+      return;
+    }
   }
 
   // 2) Insert the message. conversation_id is auto-populated by
   //    trg_message_set_conversation; last_message_* on conversations is
   //    auto-updated by trg_message_update_conversation.
-  const { error: messageError } = await supabase
+  const { data: inserted, error: messageError } = await supabase
     .from("messages")
-    .upsert(
-      {
-        contact_id: contact.id,
-        direction: "inbound",
-        content,
-        channel: "whatsapp",
-        provider_message_id: message.id,
-        created_at: createdAt,
-      },
-      { onConflict: "provider_message_id", ignoreDuplicates: true },
-    );
+    .insert({
+      contact_id: contact.id,
+      direction: "inbound",
+      content,
+      channel: "whatsapp",
+      provider_message_id: message.id ?? null,
+      created_at: createdAt,
+    })
+    .select("id,conversation_id,created_at")
+    .single();
+
+  trace.database_insert_result = {
+    ok: !messageError,
+    message_id: inserted?.id ?? null,
+    conversation_id: inserted?.conversation_id ?? null,
+    created_at: inserted?.created_at ?? null,
+    error: messageError?.message ?? null,
+  };
 
   if (messageError) {
     console.error("Error inserting message:", messageError);
     throw messageError;
+  }
+
+  if (inserted?.conversation_id) {
+    const { data: conversationAfter } = await supabase
+      .from("conversations")
+      .select("id,last_message_at,last_message_preview,last_direction,unread_count")
+      .eq("id", inserted.conversation_id)
+      .maybeSingle();
+    trace.conversation_after_insert = conversationAfter ?? null;
+  } else {
+    trace.conversation_after_insert = null;
+    trace.error = "Message inserted without conversation_id";
   }
 }
 
@@ -198,8 +368,14 @@ function fallbackBody(type: string): string {
   return known.includes(type) ? `[${type}]` : `[unsupported message: ${type}]`;
 }
 
-async function logWebhook(payload: unknown, signatureOk: boolean, error: string | null) {
+async function logWebhook(
+  payload: unknown,
+  signatureOk: boolean,
+  error: string | null,
+  businessId: string | null,
+) {
   const { error: logError } = await supabase.from("webhook_logs").insert({
+    business_id: businessId,
     source: "whatsapp",
     payload: payload ?? {},
     signature_ok: signatureOk,
