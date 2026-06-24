@@ -26,7 +26,14 @@ function verifySignature(rawBody: string, signatureHeader: string | null): boole
 type BusinessLookup = {
   businessId: string | null;
   phoneNumberId: string | null;
-  source: "whatsapp_connections" | "channel_credentials" | "env" | "not_found" | "missing_phone_number_id";
+  source:
+    | "whatsapp_connections"
+    | "whatsapp_connections_display_phone"
+    | "channel_credentials"
+    | "channel_credentials_display_phone"
+    | "env"
+    | "not_found"
+    | "missing_phone_number_id";
   attempts: Array<Record<string, unknown>>;
 };
 
@@ -40,6 +47,10 @@ type ContactLookup = {
 function whatsappPhone(from: string) {
   const digits = String(from ?? "").replace(/\D/g, "");
   return digits ? `+${digits}` : String(from ?? "").trim();
+}
+
+function phoneDigits(value: unknown) {
+  return String(value ?? "").replace(/\D/g, "");
 }
 
 function errorMessage(err: unknown) {
@@ -70,33 +81,84 @@ async function logWebhookEvent({
   if (logError) console.error("WhatsApp webhook log insert failed:", logError);
 }
 
-async function findBusinessForPhoneNumberId(phoneNumberId: string | undefined): Promise<BusinessLookup> {
+async function maybeBackfillConnectionPhoneId(connectionId: string, phoneNumberId: string | undefined) {
+  const normalized = phoneNumberId?.trim();
+  if (!normalized) return;
+  const { error } = await supabaseAdmin
+    .from("whatsapp_connections")
+    .update({ phone_number_id: normalized, updated_at: new Date().toISOString() })
+    .eq("id", connectionId)
+    .is("phone_number_id", null);
+  if (error) console.warn("WhatsApp phone_number_id backfill failed:", error.message);
+}
+
+async function findBusinessForPhoneNumberId(
+  phoneNumberId: string | undefined,
+  displayPhoneNumber?: string,
+): Promise<BusinessLookup> {
   // Multi-tenant routing: Meta sends value.metadata.phone_number_id for the
   // receiving WhatsApp number. Prefer whatsapp_connections (embedded signup),
+  // then display-phone matching for older rows missing phone_number_id,
   // then channel_credentials (manual setup), then an explicit env fallback.
   const normalized = phoneNumberId?.trim() || null;
   const attempts: BusinessLookup["attempts"] = [];
+  const displayDigits = phoneDigits(displayPhoneNumber);
 
-  if (!normalized) {
+  if (!normalized && !displayDigits) {
     return { businessId: null, phoneNumberId: null, source: "missing_phone_number_id", attempts };
   }
 
-  const { data: connection, error: connectionError } = await supabaseAdmin
-    .from("whatsapp_connections")
-    .select("business_id,status,connected_at")
-    .eq("phone_number_id", normalized)
-    .order("connected_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  attempts.push({
-    source: "whatsapp_connections",
-    ok: !connectionError,
-    business_id: connection?.business_id ?? null,
-    status: connection?.status ?? null,
-    error: connectionError?.message ?? null,
-  });
-  if (connection?.business_id) {
-    return { businessId: connection.business_id, phoneNumberId: normalized, source: "whatsapp_connections", attempts };
+  if (normalized) {
+    const { data: connection, error: connectionError } = await supabaseAdmin
+      .from("whatsapp_connections")
+      .select("id,business_id,status,connected_at")
+      .eq("phone_number_id", normalized)
+      .order("connected_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    attempts.push({
+      source: "whatsapp_connections",
+      ok: !connectionError,
+      business_id: connection?.business_id ?? null,
+      status: connection?.status ?? null,
+      error: connectionError?.message ?? null,
+    });
+    if (connection?.business_id) {
+      return { businessId: connection.business_id, phoneNumberId: normalized, source: "whatsapp_connections", attempts };
+    }
+  } else {
+    attempts.push({ source: "whatsapp_connections", ok: false, skipped: "missing_phone_number_id" });
+  }
+
+  if (displayDigits) {
+    const { data: displayRows, error: displayError } = await supabaseAdmin
+      .from("whatsapp_connections")
+      .select("id,business_id,status,phone_number,phone_number_id,connected_at")
+      .order("connected_at", { ascending: false, nullsFirst: false })
+      .limit(50);
+    const displayMatch = (displayRows ?? []).find(
+      (row) => phoneDigits(row.phone_number) === displayDigits && row.status !== "disconnected",
+    );
+    attempts.push({
+      source: "whatsapp_connections_display_phone",
+      ok: !displayError,
+      display_phone_number: displayPhoneNumber ?? null,
+      rows_checked: displayRows?.length ?? 0,
+      business_id: displayMatch?.business_id ?? null,
+      status: displayMatch?.status ?? null,
+      matched_connection_id: displayMatch?.id ?? null,
+      had_phone_number_id: Boolean(displayMatch?.phone_number_id),
+      error: displayError?.message ?? null,
+    });
+    if (displayMatch?.business_id) {
+      await maybeBackfillConnectionPhoneId(displayMatch.id, normalized ?? undefined);
+      return {
+        businessId: displayMatch.business_id,
+        phoneNumberId: normalized,
+        source: "whatsapp_connections_display_phone",
+        attempts,
+      };
+    }
   }
 
   const { data: credentialRows, error: credentialError } = await supabaseAdmin
@@ -104,10 +166,10 @@ async function findBusinessForPhoneNumberId(phoneNumberId: string | undefined): 
     .select("business_id,credentials,is_active")
     .eq("provider", "whatsapp")
     .eq("is_active", true);
-  const credentialMatch = (credentialRows ?? []).find((row) => {
+  const credentialMatch = normalized ? (credentialRows ?? []).find((row) => {
     const credentials = (row.credentials ?? {}) as Record<string, string>;
     return String(credentials.phone_number_id ?? "").trim() === normalized;
-  });
+  }) : undefined;
   attempts.push({
     source: "channel_credentials",
     ok: !credentialError,
@@ -117,6 +179,29 @@ async function findBusinessForPhoneNumberId(phoneNumberId: string | undefined): 
   });
   if (credentialMatch?.business_id) {
     return { businessId: credentialMatch.business_id, phoneNumberId: normalized, source: "channel_credentials", attempts };
+  }
+
+  if (displayDigits) {
+    const credentialDisplayMatch = (credentialRows ?? []).find((row) => {
+      const credentials = (row.credentials ?? {}) as Record<string, string>;
+      return [credentials.phone_number, credentials.display_phone_number].some(
+        (candidate) => phoneDigits(candidate) === displayDigits,
+      );
+    });
+    attempts.push({
+      source: "channel_credentials_display_phone",
+      ok: !credentialError,
+      display_phone_number: displayPhoneNumber ?? null,
+      business_id: credentialDisplayMatch?.business_id ?? null,
+    });
+    if (credentialDisplayMatch?.business_id) {
+      return {
+        businessId: credentialDisplayMatch.business_id,
+        phoneNumberId: normalized,
+        source: "channel_credentials_display_phone",
+        attempts,
+      };
+    }
   }
 
   const envPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
@@ -138,7 +223,7 @@ async function findBusinessForPhoneNumberId(phoneNumberId: string | undefined): 
 
 async function upsertContact(businessId: string, phone: string, name: string | null): Promise<ContactLookup> {
   const phoneVariants = Array.from(new Set([phone, phone.replace(/^\+/, "")].filter(Boolean)));
-  const { data: existing, error: existingError } = await supabaseAdmin
+  let { data: existing, error: existingError } = await supabaseAdmin
     .from("contacts")
     .select("id,phone")
     .eq("business_id", businessId)
@@ -146,6 +231,18 @@ async function upsertContact(businessId: string, phone: string, name: string | n
     .limit(1)
     .maybeSingle();
   if (existingError) throw existingError;
+
+  if (!existing) {
+    const digits = phoneDigits(phone);
+    const { data: possibleMatches, error: possibleError } = await supabaseAdmin
+      .from("contacts")
+      .select("id,phone")
+      .eq("business_id", businessId)
+      .limit(1000);
+    if (possibleError) throw possibleError;
+    existing = (possibleMatches ?? []).find((candidate) => phoneDigits(candidate.phone) === digits) ?? null;
+  }
+
   if (existing) {
     if (existing.phone !== phone) {
       const { error: updateError } = await supabaseAdmin
@@ -163,6 +260,33 @@ async function upsertContact(businessId: string, phone: string, name: string | n
     .single();
   if (error) throw error;
   return { id: created.id, created: true, phone: created.phone, matchedPhone: created.phone };
+}
+
+async function getOrCreateConversation(businessId: string, contactId: string) {
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from("conversations")
+    .select("id,business_id,contact_id,last_message_at,last_message_preview,last_direction,unread_count")
+    .eq("contact_id", contactId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existing) return { conversation: existing, created: false };
+
+  const { data: created, error: createError } = await supabaseAdmin
+    .from("conversations")
+    .insert({ business_id: businessId, contact_id: contactId })
+    .select("id,business_id,contact_id,last_message_at,last_message_preview,last_direction,unread_count")
+    .single();
+
+  if (!createError) return { conversation: created, created: true };
+  if (createError.code !== "23505") throw createError;
+
+  const { data: raced, error: racedError } = await supabaseAdmin
+    .from("conversations")
+    .select("id,business_id,contact_id,last_message_at,last_message_preview,last_direction,unread_count")
+    .eq("contact_id", contactId)
+    .single();
+  if (racedError) throw racedError;
+  return { conversation: raced, created: false };
 }
 
 export const Route = createFileRoute("/api/public/whatsapp/webhook")({
@@ -222,7 +346,8 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
             for (const change of entry?.changes ?? []) {
               const value = change?.value ?? {};
               const phoneNumberId: string | undefined = value?.metadata?.phone_number_id;
-              const businessLookup = await findBusinessForPhoneNumberId(phoneNumberId);
+              const displayPhoneNumber: string | undefined = value?.metadata?.display_phone_number;
+              const businessLookup = await findBusinessForPhoneNumberId(phoneNumberId, displayPhoneNumber);
               const businessId = businessLookup.businessId;
 
               const contactsMeta: Array<{ wa_id: string; profile?: { name?: string } }> =
@@ -244,6 +369,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                 const trace: Record<string, unknown> = {
                   event: "inbound_message",
                   phone_number_id: phoneNumberId ?? null,
+                  display_phone_number: displayPhoneNumber ?? null,
                   sender_number: phone,
                   message_text: text,
                   provider_message_id: providerId,
@@ -270,19 +396,15 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   );
                   trace.contact_result = contact;
 
-                  const { data: conversation, error: conversationError } = await supabaseAdmin
-                    .from("conversations")
-                    .select("id,business_id,contact_id,last_message_at,last_message_preview,last_direction,unread_count")
-                    .eq("contact_id", contact.id)
-                    .maybeSingle();
+                  const { conversation, created: conversationCreated } = await getOrCreateConversation(businessId, contact.id);
                   trace.conversation_lookup_result = {
                     found: Boolean(conversation),
                     conversation_id: conversation?.id ?? null,
                     business_id: conversation?.business_id ?? null,
                     unread_count: conversation?.unread_count ?? null,
-                    error: conversationError?.message ?? null,
+                    created: conversationCreated,
+                    error: null,
                   };
-                  if (conversationError) throw conversationError;
 
                   if (providerId) {
                     const { data: duplicate, error: duplicateError } = await supabaseAdmin
@@ -308,10 +430,12 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                     .from("messages")
                     .insert({
                       contact_id: contact.id,
+                      conversation_id: conversation.id,
                       direction: "inbound",
                       content: text,
                       channel: "whatsapp",
                       provider_message_id: providerId,
+                      created_at: m?.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString(),
                     })
                     .select("id,conversation_id,created_at")
                     .single();
