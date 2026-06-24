@@ -14,21 +14,55 @@ async function getCreds(businessId: string, provider: "whatsapp" | "africastalki
   return data.credentials as Record<string, string>;
 }
 
-export async function sendWhatsApp(businessId: string, toPhone: string, content: string) {
+async function resolveWhatsAppSendConfig(businessId: string) {
   const c = await getCreds(businessId, "whatsapp");
-  // Prefer the live whatsapp_connections row, fall back to channel_credentials, then env.
+  // Prefer an explicitly connected phone-number row for this business. Do not
+  // use another business's env/default phone_number_id; replies route back by
+  // phone_number_id, so that creates hidden cross-tenant inbox mismatches.
   const { data: conn } = await supabaseAdmin
     .from("whatsapp_connections")
-    .select("phone_number_id")
+    .select("phone_number_id,meta,connected_at")
     .eq("business_id", businessId)
     .eq("status", "connected")
+    .not("phone_number_id", "is", null)
+    .neq("phone_number_id", "")
     .order("connected_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const token = c?.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId =
-    conn?.phone_number_id ?? c?.phone_number_id ?? process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  const connMeta = (conn?.meta ?? {}) as Record<string, string>;
+  const token = connMeta.access_token ?? c?.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
+  let phoneNumberId = conn?.phone_number_id ?? c?.phone_number_id ?? null;
+
+  if (!phoneNumberId) {
+    const envPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+    const envDefaultBusinessId = process.env.WHATSAPP_DEFAULT_BUSINESS_ID?.trim();
+    if (envPhoneNumberId) {
+      const { data: envOwner } = await supabaseAdmin
+        .from("whatsapp_connections")
+        .select("business_id")
+        .eq("phone_number_id", envPhoneNumberId)
+        .limit(1)
+        .maybeSingle();
+      const envBelongsHere = envOwner?.business_id === businessId || envDefaultBusinessId === businessId;
+      const envBelongsElsewhere = Boolean(
+        (envOwner?.business_id && envOwner.business_id !== businessId) ||
+          (envDefaultBusinessId && envDefaultBusinessId !== businessId),
+      );
+      if (envBelongsHere || (!envOwner?.business_id && !envDefaultBusinessId)) {
+        phoneNumberId = envPhoneNumberId;
+      } else if (envBelongsElsewhere) {
+        throw new Error("WhatsApp phone number is configured for a different business; reconnect WhatsApp for this workspace.");
+      }
+    }
+  }
+
   if (!token || !phoneNumberId) throw new Error("WhatsApp not configured");
+  return { token, phoneNumberId };
+}
+
+export async function sendWhatsApp(businessId: string, toPhone: string, content: string) {
+  const { token, phoneNumberId } = await resolveWhatsAppSendConfig(businessId);
   const res = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
