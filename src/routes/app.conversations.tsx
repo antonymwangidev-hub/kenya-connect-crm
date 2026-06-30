@@ -616,7 +616,11 @@ function ConversationsPage() {
                 <Input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Type a message…"
+                  placeholder={
+                    sessionStatus.open || direction === "inbound"
+                      ? "Type a message…"
+                      : "24h window closed — use Templates to send"
+                  }
                   className="flex-1"
                   disabled={sending}
                 />
