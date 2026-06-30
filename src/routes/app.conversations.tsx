@@ -176,7 +176,7 @@ function ConversationsPage() {
       if (initial) setConvLoading(true);
       const { data, error } = await supabase
         .from("conversations")
-        .select("id,contact_id,last_message_at,last_message_preview,last_direction,unread_count,contact:contacts!inner(id,name,phone)")
+        .select("id,contact_id,last_message_at,last_message_preview,last_direction,last_inbound_at,unread_count,contact:contacts!inner(id,name,phone)")
         .eq("business_id", businessId)
         .order("last_message_at", { ascending: false });
       if (cancelled) return;
