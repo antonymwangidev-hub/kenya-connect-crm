@@ -214,7 +214,7 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
       .single();
     if (!biz) throw new Error("Business not found");
 
-    const { data: row, error } = await supabase
+    const { data: inserted, error } = await supabase
       .from("whatsapp_connections")
       .insert({
         business_id: biz.id,
@@ -231,9 +231,16 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
           app_id: appId,
         },
       })
-      .select()
+      .select("id")
       .single();
-    if (error) throw new Error(error.message);
+    if (error || !inserted) throw new Error(error?.message ?? "Insert failed");
+    // Re-query with safe columns only — never return access_token to the browser.
+    const { data: row } = await supabase
+      .from("whatsapp_connections")
+      .select(SAFE_CONNECTION_COLUMNS)
+      .eq("id", inserted.id)
+      .single();
     return { connection: row };
   });
+
 
