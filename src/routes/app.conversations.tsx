@@ -35,6 +35,7 @@ type Conversation = {
   last_message_at: string;
   last_message_preview: string | null;
   last_direction: string | null;
+  last_inbound_at: string | null;
   unread_count: number;
   contact: { id: string; name: string; phone: string };
 };
