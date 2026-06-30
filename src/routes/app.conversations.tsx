@@ -114,6 +114,38 @@ function MsgSkeleton({ out }: { out?: boolean }) {
   );
 }
 
+function useSessionStatus(lastInboundAt: string | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!lastInboundAt) return { open: false, expiresInMs: 0, label: "No inbound message yet — start with a template.", color: "red" as const };
+  const expiresAt = new Date(lastInboundAt).getTime() + 24 * 60 * 60 * 1000;
+  const remaining = expiresAt - now;
+  if (remaining <= 0) return { open: false, expiresInMs: 0, label: "Conversation window expired. Send an approved template to reopen.", color: "red" as const };
+  const hoursLeft = Math.ceil(remaining / 3_600_000);
+  if (hoursLeft <= 3) return { open: true, expiresInMs: remaining, label: `Session expires in ~${hoursLeft}h`, color: "orange" as const };
+  return { open: true, expiresInMs: remaining, label: `24-hour session active · ${hoursLeft}h left`, color: "green" as const };
+}
+
+function SessionBanner({ status }: { status: ReturnType<typeof useSessionStatus> }) {
+  const dot =
+    status.color === "green" ? "bg-green-500" : status.color === "orange" ? "bg-amber-500" : "bg-red-500";
+  const bg =
+    status.color === "green"
+      ? "bg-green-500/10 text-green-700 dark:text-green-400"
+      : status.color === "orange"
+      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+      : "bg-red-500/10 text-red-700 dark:text-red-400";
+  return (
+    <div className={`flex items-center gap-2 border-b px-4 py-1.5 text-xs font-medium ${bg}`}>
+      <span className={`h-2 w-2 rounded-full ${dot}`} />
+      {status.label}
+    </div>
+  );
+}
+
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
