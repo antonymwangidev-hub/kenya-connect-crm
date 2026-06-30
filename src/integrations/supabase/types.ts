@@ -373,6 +373,7 @@ export type Database = {
           created_at: string
           id: string
           last_direction: string | null
+          last_inbound_at: string | null
           last_message_at: string
           last_message_preview: string | null
           team: string | null
@@ -385,6 +386,7 @@ export type Database = {
           created_at?: string
           id?: string
           last_direction?: string | null
+          last_inbound_at?: string | null
           last_message_at?: string
           last_message_preview?: string | null
           team?: string | null
@@ -397,6 +399,7 @@ export type Database = {
           created_at?: string
           id?: string
           last_direction?: string | null
+          last_inbound_at?: string | null
           last_message_at?: string
           last_message_preview?: string | null
           team?: string | null
@@ -853,6 +856,94 @@ export type Database = {
           waba_id?: string | null
         }
         Relationships: []
+      }
+      whatsapp_template_sync_logs: {
+        Row: {
+          business_id: string
+          created_at: string
+          error: string | null
+          id: string
+          status: string
+          synced_count: number
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          status: string
+          synced_count?: number
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          status?: string
+          synced_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_template_sync_logs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_templates: {
+        Row: {
+          business_id: string
+          category: string | null
+          components: Json
+          created_at: string
+          id: string
+          language: string
+          last_synced_at: string
+          meta_template_id: string | null
+          name: string
+          status: string
+          updated_at: string
+          waba_id: string | null
+        }
+        Insert: {
+          business_id: string
+          category?: string | null
+          components?: Json
+          created_at?: string
+          id?: string
+          language: string
+          last_synced_at?: string
+          meta_template_id?: string | null
+          name: string
+          status?: string
+          updated_at?: string
+          waba_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          category?: string | null
+          components?: Json
+          created_at?: string
+          id?: string
+          language?: string
+          last_synced_at?: string
+          meta_template_id?: string | null
+          name?: string
+          status?: string
+          updated_at?: string
+          waba_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_templates_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
