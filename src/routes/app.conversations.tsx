@@ -290,6 +290,8 @@ function ConversationsPage() {
     );
   }, [conversations, search]);
 
+  const sessionStatus = useSessionStatus(active?.last_inbound_at ?? null);
+
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!active || !draft.trim() || sending) return;
