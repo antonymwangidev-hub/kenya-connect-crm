@@ -474,11 +474,28 @@ function ConversationsPage() {
               <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
                 {active.contact.name.slice(0, 1).toUpperCase()}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{active.contact.name}</p>
                 <p className="truncate text-xs text-muted-foreground">{active.contact.phone}</p>
               </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => setTemplateOpen(true)}
+                title="Send an approved WhatsApp template"
+              >
+                <FileText className="h-3.5 w-3.5" /> Templates
+              </Button>
             </header>
+            <SessionBanner status={sessionStatus} />
+            <SendTemplateModal
+              open={templateOpen}
+              onOpenChange={setTemplateOpen}
+              contactId={active.contact_id}
+              contactName={active.contact.name}
+            />
 
             <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto scroll-smooth px-4 py-6">
               {msgLoading ? (
