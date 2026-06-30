@@ -34,6 +34,25 @@ export const Route = createFileRoute("/api/public/mpesa/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Optional shared secret. When MPESA_WEBHOOK_SECRET is set, Daraja must
+        // include it via `?secret=` or `x-mpesa-secret` header.
+        const expectedSecret = process.env.MPESA_WEBHOOK_SECRET;
+        if (expectedSecret) {
+          const headerSecret = request.headers.get("x-mpesa-secret");
+          let querySecret: string | null = null;
+          try {
+            querySecret = new URL(request.url).searchParams.get("secret");
+          } catch {
+            /* ignore */
+          }
+          if (headerSecret !== expectedSecret && querySecret !== expectedSecret) {
+            return new Response(
+              JSON.stringify({ ResultCode: 1, ResultDesc: "Unauthorized" }),
+              { status: 401, headers: JSON_HEADERS },
+            );
+          }
+        }
+
         // Rate limit: 120 req/min per IP — generous for legitimate Daraja retries.
         const ip = clientIp(request);
         const allowed = await checkRateLimit("mpesa_webhook", ip, 120, 60);
