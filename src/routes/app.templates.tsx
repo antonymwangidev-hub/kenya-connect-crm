@@ -77,7 +77,7 @@ function TemplatesPage() {
     setWaLoading(true);
     try {
       const { templates } = await listFn();
-      setWa((templates as WaTpl[]) ?? []);
+      setWa((templates as unknown as WaTpl[]) ?? []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to load templates");
     } finally {
