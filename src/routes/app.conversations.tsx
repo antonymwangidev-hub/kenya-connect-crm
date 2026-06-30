@@ -11,6 +11,7 @@ import {
   Search,
   ArrowLeft,
   Wand2,
+  FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { suggestReply } from "@/lib/ai.functions";
+import { SendTemplateModal } from "@/components/SendTemplateModal";
 
 type Tone = "polite" | "sales" | "urgent";
 
@@ -33,6 +35,7 @@ type Conversation = {
   last_message_at: string;
   last_message_preview: string | null;
   last_direction: string | null;
+  last_inbound_at: string | null;
   unread_count: number;
   contact: { id: string; name: string; phone: string };
 };
@@ -111,6 +114,38 @@ function MsgSkeleton({ out }: { out?: boolean }) {
   );
 }
 
+function useSessionStatus(lastInboundAt: string | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!lastInboundAt) return { open: false, expiresInMs: 0, label: "No inbound message yet — start with a template.", color: "red" as const };
+  const expiresAt = new Date(lastInboundAt).getTime() + 24 * 60 * 60 * 1000;
+  const remaining = expiresAt - now;
+  if (remaining <= 0) return { open: false, expiresInMs: 0, label: "Conversation window expired. Send an approved template to reopen.", color: "red" as const };
+  const hoursLeft = Math.ceil(remaining / 3_600_000);
+  if (hoursLeft <= 3) return { open: true, expiresInMs: remaining, label: `Session expires in ~${hoursLeft}h`, color: "orange" as const };
+  return { open: true, expiresInMs: remaining, label: `24-hour session active · ${hoursLeft}h left`, color: "green" as const };
+}
+
+function SessionBanner({ status }: { status: ReturnType<typeof useSessionStatus> }) {
+  const dot =
+    status.color === "green" ? "bg-green-500" : status.color === "orange" ? "bg-amber-500" : "bg-red-500";
+  const bg =
+    status.color === "green"
+      ? "bg-green-500/10 text-green-700 dark:text-green-400"
+      : status.color === "orange"
+      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+      : "bg-red-500/10 text-red-700 dark:text-red-400";
+  return (
+    <div className={`flex items-center gap-2 border-b px-4 py-1.5 text-xs font-medium ${bg}`}>
+      <span className={`h-2 w-2 rounded-full ${dot}`} />
+      {status.label}
+    </div>
+  );
+}
+
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
@@ -129,6 +164,7 @@ function ConversationsPage() {
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
+  const [templateOpen, setTemplateOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 30;
 
@@ -140,7 +176,7 @@ function ConversationsPage() {
       if (initial) setConvLoading(true);
       const { data, error } = await supabase
         .from("conversations")
-        .select("id,contact_id,last_message_at,last_message_preview,last_direction,unread_count,contact:contacts!inner(id,name,phone)")
+        .select("id,contact_id,last_message_at,last_message_preview,last_direction,last_inbound_at,unread_count,contact:contacts!inner(id,name,phone)")
         .eq("business_id", businessId)
         .order("last_message_at", { ascending: false });
       if (cancelled) return;
@@ -254,13 +290,15 @@ function ConversationsPage() {
     );
   }, [conversations, search]);
 
+  const sessionStatus = useSessionStatus(active?.last_inbound_at ?? null);
+
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!active || !draft.trim() || sending) return;
     const content = draft.trim();
-    setDraft("");
 
     if (direction === "inbound") {
+      setDraft("");
       const { error } = await supabase.from("messages").insert({
         contact_id: active.contact_id,
         direction: "inbound",
@@ -271,6 +309,15 @@ function ConversationsPage() {
       return;
     }
 
+    // Smart send: outside the 24h window, free-form WhatsApp text is rejected
+    // by Meta. Open the template picker instead of attempting a send.
+    if (!sessionStatus.open) {
+      toast.message("24h window closed — pick an approved template to reopen the conversation.");
+      setTemplateOpen(true);
+      return;
+    }
+
+    setDraft("");
     setSending(true);
     try {
       const result = await sendFn({ data: { contactId: active.contact_id, content } });
@@ -427,11 +474,28 @@ function ConversationsPage() {
               <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
                 {active.contact.name.slice(0, 1).toUpperCase()}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{active.contact.name}</p>
                 <p className="truncate text-xs text-muted-foreground">{active.contact.phone}</p>
               </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => setTemplateOpen(true)}
+                title="Send an approved WhatsApp template"
+              >
+                <FileText className="h-3.5 w-3.5" /> Templates
+              </Button>
             </header>
+            <SessionBanner status={sessionStatus} />
+            <SendTemplateModal
+              open={templateOpen}
+              onOpenChange={setTemplateOpen}
+              contactId={active.contact_id}
+              contactName={active.contact.name}
+            />
 
             <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto scroll-smooth px-4 py-6">
               {msgLoading ? (
@@ -552,7 +616,11 @@ function ConversationsPage() {
                 <Input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Type a message…"
+                  placeholder={
+                    sessionStatus.open || direction === "inbound"
+                      ? "Type a message…"
+                      : "24h window closed — use Templates to send"
+                  }
                   className="flex-1"
                   disabled={sending}
                 />
