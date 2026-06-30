@@ -8,13 +8,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // app id + config token, which we read from channel_credentials.whatsapp.meta
 // once the user pastes them in Settings → Advanced.
 
+const SAFE_CONNECTION_COLUMNS =
+  "id,business_id,phone_number,display_name,phone_number_id,waba_id,status,quality_rating,connected_at,disconnected_at,created_at";
+
 export const getMyWhatsappConnection = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const { data } = await supabase
       .from("whatsapp_connections")
-      .select("*")
+      .select(SAFE_CONNECTION_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -211,7 +214,7 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
       .single();
     if (!biz) throw new Error("Business not found");
 
-    const { data: row, error } = await supabase
+    const { data: inserted, error } = await supabase
       .from("whatsapp_connections")
       .insert({
         business_id: biz.id,
@@ -228,9 +231,16 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
           app_id: appId,
         },
       })
-      .select()
+      .select("id")
       .single();
-    if (error) throw new Error(error.message);
+    if (error || !inserted) throw new Error(error?.message ?? "Insert failed");
+    // Re-query with safe columns only — never return access_token to the browser.
+    const { data: row } = await supabase
+      .from("whatsapp_connections")
+      .select(SAFE_CONNECTION_COLUMNS)
+      .eq("id", inserted.id)
+      .single();
     return { connection: row };
   });
+
 
