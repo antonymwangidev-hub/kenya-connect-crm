@@ -296,9 +296,9 @@ function ConversationsPage() {
     e.preventDefault();
     if (!active || !draft.trim() || sending) return;
     const content = draft.trim();
-    setDraft("");
 
     if (direction === "inbound") {
+      setDraft("");
       const { error } = await supabase.from("messages").insert({
         contact_id: active.contact_id,
         direction: "inbound",
@@ -309,6 +309,15 @@ function ConversationsPage() {
       return;
     }
 
+    // Smart send: outside the 24h window, free-form WhatsApp text is rejected
+    // by Meta. Open the template picker instead of attempting a send.
+    if (!sessionStatus.open) {
+      toast.message("24h window closed — pick an approved template to reopen the conversation.");
+      setTemplateOpen(true);
+      return;
+    }
+
+    setDraft("");
     setSending(true);
     try {
       const result = await sendFn({ data: { contactId: active.contact_id, content } });
