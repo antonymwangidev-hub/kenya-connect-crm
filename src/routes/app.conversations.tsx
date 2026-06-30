@@ -11,6 +11,7 @@ import {
   Search,
   ArrowLeft,
   Wand2,
+  FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { suggestReply } from "@/lib/ai.functions";
+import { SendTemplateModal } from "@/components/SendTemplateModal";
 
 type Tone = "polite" | "sales" | "urgent";
 
