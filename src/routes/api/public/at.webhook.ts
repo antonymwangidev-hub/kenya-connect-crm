@@ -17,6 +17,25 @@ export const Route = createFileRoute("/api/public/at/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Optional shared secret. When AT_WEBHOOK_SECRET is set, AT must include
+        // it via `?secret=` or `x-at-secret` header, otherwise reject.
+        const expectedSecret = process.env.AT_WEBHOOK_SECRET;
+        if (expectedSecret) {
+          const headerSecret = request.headers.get("x-at-secret");
+          let querySecret: string | null = null;
+          try {
+            querySecret = new URL(request.url).searchParams.get("secret");
+          } catch {
+            /* ignore */
+          }
+          if (headerSecret !== expectedSecret && querySecret !== expectedSecret) {
+            return new Response(JSON.stringify({ error: "unauthorized" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+        }
+
         const ip = clientIp(request);
         const allowed = await checkRateLimit("at_webhook", ip, 120, 60);
         if (!allowed) return tooManyRequests();
