@@ -2,11 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 
-// Called hourly by pg_cron. Optionally protected by CRON_SECRET — when set,
-// callers must provide it via `x-cron-secret` header or `?token=` query.
+// Protected by CRON_SECRET — callers must provide it via `x-cron-secret`
+// header or `?token=`. Fail-closed: if the secret is not configured the
+// endpoint refuses all calls.
 function isAuthorized(request: Request): boolean {
   const expected = process.env.CRON_SECRET;
-  if (!expected) return true; // open if not configured
+  if (!expected) return false; // fail-closed when not configured
   const header = request.headers.get("x-cron-secret");
   if (header && header === expected) return true;
   try {
