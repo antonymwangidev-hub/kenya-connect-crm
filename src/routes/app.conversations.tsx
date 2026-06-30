@@ -164,6 +164,7 @@ function ConversationsPage() {
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
+  const [templateOpen, setTemplateOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 30;
 
