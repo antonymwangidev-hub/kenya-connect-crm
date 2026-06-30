@@ -8,13 +8,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // app id + config token, which we read from channel_credentials.whatsapp.meta
 // once the user pastes them in Settings → Advanced.
 
+const SAFE_CONNECTION_COLUMNS =
+  "id,business_id,phone_number,display_name,phone_number_id,waba_id,status,quality_rating,connected_at,disconnected_at,created_at";
+
 export const getMyWhatsappConnection = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const { data } = await supabase
       .from("whatsapp_connections")
-      .select("*")
+      .select(SAFE_CONNECTION_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
