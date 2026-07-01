@@ -690,14 +690,51 @@ function ConversationsPage() {
                   Send AI
                 </Button>
               </div>
-              <div className="flex gap-2">
+              {pendingFile && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
+                  <FileIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{pendingFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                    className="rounded p-0.5 hover:bg-muted"
+                    aria-label="Remove attachment"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (f.size > 16 * 1024 * 1024) { toast.error("Max 16MB"); return; }
+                    setPendingFile(f);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  disabled={sending || uploading || direction === "inbound"}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach file"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
                 <Input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder={
                     sessionStatus.open || direction === "inbound"
                       ? "Type a message…"
-                      : "24h window closed — use Templates to send"
+                      : "24h window closed — use Templates"
                   }
                   className="flex-1"
                   disabled={sending}
@@ -705,6 +742,8 @@ function ConversationsPage() {
                 <Button
                   type="button"
                   variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
                   disabled={suggesting || !active}
                   title="Quick AI suggestion"
                   onClick={async () => {
@@ -723,8 +762,8 @@ function ConversationsPage() {
                 >
                   <Sparkles className="h-4 w-4" />
                 </Button>
-                <Button type="submit" disabled={!draft.trim() || sending}>
-                  <Send className="h-4 w-4" />
+                <Button type="submit" size="icon" className="h-10 w-10 shrink-0" disabled={(!draft.trim() && !pendingFile) || sending || uploading}>
+                  {sending || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
             </form>
