@@ -12,6 +12,12 @@ import {
   ArrowLeft,
   Wand2,
   FileText,
+  Paperclip,
+  X,
+  Download,
+  Play,
+  FileIcon,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -20,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { suggestReply } from "@/lib/ai.functions";
+import { createChatMediaUploadUrl, getChatMediaSignedUrl } from "@/lib/media.functions";
 import { SendTemplateModal } from "@/components/SendTemplateModal";
 
 type Tone = "polite" | "sales" | "urgent";
@@ -29,6 +36,7 @@ export const Route = createFileRoute("/app/conversations")({
 });
 
 type Channel = "manual" | "whatsapp" | "sms";
+type MediaType = "image" | "video" | "audio" | "document";
 type Conversation = {
   id: string;
   contact_id: string;
@@ -47,7 +55,13 @@ type Message = {
   content: string;
   channel: Channel;
   created_at: string;
+  media_url: string | null;
+  media_type: MediaType | null;
+  media_mime: string | null;
+  media_filename: string | null;
+  media_size: number | null;
 };
+
 
 function ChannelBadge({ channel }: { channel: Channel }) {
   if (channel === "whatsapp") {
