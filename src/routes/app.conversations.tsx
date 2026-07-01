@@ -160,10 +160,53 @@ function SessionBanner({ status }: { status: ReturnType<typeof useSessionStatus>
   );
 }
 
+function MediaBubble({ m }: { m: Message }) {
+  const signFn = useServerFn(getChatMediaSignedUrl);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!m.media_url) return;
+    let cancelled = false;
+    signFn({ data: { path: m.media_url } })
+      .then((r) => { if (!cancelled) setUrl(r.url); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [m.media_url, signFn]);
+  if (!m.media_url) return null;
+  const kind = m.media_type ?? "document";
+  if (kind === "image") {
+    return url ? (
+      <a href={url} target="_blank" rel="noreferrer">
+        <img src={url} alt={m.media_filename ?? ""} className="mb-1 max-h-64 rounded-lg object-cover" />
+      </a>
+    ) : <div className="mb-1 h-40 w-56 animate-pulse rounded-lg bg-black/10" />;
+  }
+  if (kind === "video") {
+    return url ? (
+      <video src={url} controls className="mb-1 max-h-64 rounded-lg" />
+    ) : <div className="mb-1 grid h-40 w-56 place-items-center rounded-lg bg-black/10"><Play className="h-6 w-6 opacity-60" /></div>;
+  }
+  if (kind === "audio") {
+    return url ? <audio src={url} controls className="mb-1 w-full" /> : <div className="mb-1 h-10 w-56 animate-pulse rounded bg-black/10" />;
+  }
+  return (
+    <a
+      href={url ?? "#"}
+      target="_blank"
+      rel="noreferrer"
+      className="mb-1 flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-xs hover:bg-black/10"
+    >
+      <FileIcon className="h-4 w-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{m.media_filename ?? "Attachment"}</span>
+      <Download className="h-3.5 w-3.5 opacity-60" />
+    </a>
+  );
+}
+
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
   const suggestFn = useServerFn(suggestReply);
+  const uploadUrlFn = useServerFn(createChatMediaUploadUrl);
   const [suggesting, setSuggesting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [tone, setTone] = useState<Tone>("polite");
@@ -179,6 +222,9 @@ function ConversationsPage() {
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 30;
 
