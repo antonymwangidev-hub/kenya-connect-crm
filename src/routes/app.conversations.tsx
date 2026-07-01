@@ -352,45 +352,62 @@ function ConversationsPage() {
 
   const sessionStatus = useSessionStatus(active?.last_inbound_at ?? null);
 
+  const detectMediaType = (file: File): MediaType => {
+    if (file.type.startsWith("image/")) return "image";
+    if (file.type.startsWith("video/")) return "video";
+    if (file.type.startsWith("audio/")) return "audio";
+    return "document";
+  };
+
+  const uploadPendingFile = async (): Promise<{
+    path: string; type: MediaType; mime: string; filename: string; size: number;
+  } | null> => {
+    if (!pendingFile || !active) return null;
+    setUploading(true);
+    try {
+      const { path, token } = await uploadUrlFn({ data: { contactId: active.contact_id, filename: pendingFile.name } });
+      const { error } = await supabase.storage.from("chat-media").uploadToSignedUrl(path, token, pendingFile, {
+        contentType: pendingFile.type || "application/octet-stream",
+      });
+      if (error) throw error;
+      return {
+        path, type: detectMediaType(pendingFile), mime: pendingFile.type || "application/octet-stream",
+        filename: pendingFile.name, size: pendingFile.size,
+      };
+    } finally { setUploading(false); }
+  };
+
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!active || !draft.trim() || sending) return;
+    if (!active || sending) return;
     const content = draft.trim();
+    if (!content && !pendingFile) return;
 
     if (direction === "inbound") {
       setDraft("");
       const { error } = await supabase.from("messages").insert({
-        contact_id: active.contact_id,
-        direction: "inbound",
-        content,
-        channel: "manual",
+        contact_id: active.contact_id, direction: "inbound", content, channel: "manual",
       });
       if (error) toast.error(error.message);
       return;
     }
 
-    // Smart send: outside the 24h window, free-form WhatsApp text is rejected
-    // by Meta. Open the template picker instead of attempting a send.
     if (!sessionStatus.open) {
       toast.message("24h window closed — pick an approved template to reopen the conversation.");
       setTemplateOpen(true);
       return;
     }
 
-    setDraft("");
     setSending(true);
     try {
-      const result = await sendFn({ data: { contactId: active.contact_id, content } });
+      const media = pendingFile ? await uploadPendingFile() : null;
+      const result = await sendFn({ data: { contactId: active.contact_id, content, ...(media ? { media } : {}) } });
+      setDraft("");
+      setPendingFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success(`Sent via ${result.channel}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Send failed";
-      toast.error(msg);
-      await supabase.from("messages").insert({
-        contact_id: active.contact_id,
-        direction: "outbound",
-        content,
-        channel: "manual",
-      });
+      toast.error(err instanceof Error ? err.message : "Send failed");
     } finally {
       setSending(false);
     }
