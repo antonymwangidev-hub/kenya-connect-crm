@@ -234,7 +234,7 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
         channel,
         ...(data.media
           ? {
-              media_url: mediaPublicUrl,
+              media_url: data.media.path,
               media_type: data.media.type,
               media_mime: data.media.mime ?? null,
               media_filename: data.media.filename ?? null,
