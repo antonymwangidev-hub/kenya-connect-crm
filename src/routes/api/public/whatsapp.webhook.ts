@@ -92,6 +92,66 @@ async function maybeBackfillConnectionPhoneId(connectionId: string, phoneNumberI
   if (error) console.warn("WhatsApp phone_number_id backfill failed:", error.message);
 }
 
+async function getBusinessWhatsappToken(businessId: string): Promise<string | null> {
+  const { data: conn } = await supabaseAdmin
+    .from("whatsapp_connections")
+    .select("meta")
+    .eq("business_id", businessId)
+    .eq("status", "connected")
+    .order("connected_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const meta = (conn?.meta ?? {}) as Record<string, unknown>;
+  const fromConn = typeof meta.access_token === "string" ? meta.access_token : null;
+  if (fromConn) return fromConn;
+  const { data: cred } = await supabaseAdmin
+    .from("channel_credentials")
+    .select("credentials")
+    .eq("business_id", businessId)
+    .eq("provider", "whatsapp")
+    .eq("is_active", true)
+    .maybeSingle();
+  const c = (cred?.credentials ?? {}) as Record<string, string>;
+  return c.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN ?? null;
+}
+
+async function downloadWhatsappMedia(opts: {
+  businessId: string;
+  mediaId: string;
+  contactId: string;
+  kind: "image" | "video" | "audio" | "document";
+  filename: string | null;
+  mime: string | null;
+}): Promise<Record<string, unknown> | null> {
+  const token = await getBusinessWhatsappToken(opts.businessId);
+  if (!token) return null;
+  const version = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
+  const metaRes = await fetch(`https://graph.facebook.com/${version}/${opts.mediaId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!metaRes.ok) throw new Error(`media meta ${metaRes.status}`);
+  const metaJson = (await metaRes.json()) as { url?: string; mime_type?: string; file_size?: number };
+  if (!metaJson.url) throw new Error("no media url");
+  const fileRes = await fetch(metaJson.url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!fileRes.ok) throw new Error(`media fetch ${fileRes.status}`);
+  const buf = new Uint8Array(await fileRes.arrayBuffer());
+  const mime = opts.mime ?? metaJson.mime_type ?? "application/octet-stream";
+  const ext = mime.split("/")[1]?.split(";")[0] ?? "bin";
+  const safeName = (opts.filename ?? `${opts.kind}-${Date.now()}.${ext}`).replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `inbound/${opts.businessId}/${opts.contactId}/${Date.now()}-${safeName}`;
+  const { error: upErr } = await supabaseAdmin.storage
+    .from("chat-media")
+    .upload(path, buf, { contentType: mime, upsert: false });
+  if (upErr) throw upErr;
+  return {
+    media_url: path,
+    media_type: opts.kind,
+    media_mime: mime,
+    media_filename: opts.filename ?? null,
+    media_size: metaJson.file_size ?? buf.byteLength,
+  };
+}
+
 async function findBusinessForPhoneNumberId(
   phoneNumberId: string | undefined,
   displayPhoneNumber?: string,
