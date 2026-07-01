@@ -50,8 +50,10 @@ declare global {
   }
 }
 
-const APP_ID = import.meta.env.VITE_WHATSAPP_APP_ID as string | undefined;
-const CONFIG_ID = import.meta.env.VITE_WHATSAPP_CONFIG_ID as string | undefined;
+const APP_ID =
+  (import.meta.env.VITE_WHATSAPP_APP_ID as string | undefined) ?? "946931544897443";
+const CONFIG_ID =
+  (import.meta.env.VITE_WHATSAPP_CONFIG_ID as string | undefined) ?? "1996897057886691";
 const GRAPH_VERSION =
   (import.meta.env.VITE_WHATSAPP_GRAPH_VERSION as string | undefined) ?? "v21.0";
 
