@@ -362,8 +362,15 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                 const from: string = m?.from;
                 if (!from) continue;
                 const phone = whatsappPhone(from);
+                const mediaKind = (
+                  ["image", "video", "audio", "document", "sticker"] as const
+                ).find((k) => m?.[k]);
+                const mediaNode = mediaKind ? m[mediaKind] : null;
                 const text: string =
-                  m?.text?.body ?? m?.button?.text ?? `[${m?.type ?? "message"}]`;
+                  m?.text?.body ??
+                  m?.button?.text ??
+                  mediaNode?.caption ??
+                  (mediaKind ? "" : `[${m?.type ?? "message"}]`);
                 const providerId: string | null = m?.id ?? null;
 
                 const trace: Record<string, unknown> = {
@@ -426,6 +433,24 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                     }
                   }
 
+                  // Media download: pull from Meta and persist to chat-media.
+                  let mediaFields: Record<string, unknown> = {};
+                  if (mediaKind && mediaNode?.id) {
+                    try {
+                      const stored = await downloadWhatsappMedia({
+                        businessId,
+                        mediaId: mediaNode.id,
+                        contactId: contact.id,
+                        kind: mediaKind === "sticker" ? "image" : mediaKind,
+                        filename: mediaNode.filename ?? null,
+                        mime: mediaNode.mime_type ?? null,
+                      });
+                      if (stored) mediaFields = stored;
+                    } catch (mediaErr) {
+                      trace.media_error = errorMessage(mediaErr);
+                    }
+                  }
+
                   const { data: inserted, error: insertError } = await supabaseAdmin
                     .from("messages")
                     .insert({
@@ -436,6 +461,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                       channel: "whatsapp",
                       provider_message_id: providerId,
                       created_at: m?.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString(),
+                      ...mediaFields,
                     })
                     .select("id,conversation_id,created_at")
                     .single();
