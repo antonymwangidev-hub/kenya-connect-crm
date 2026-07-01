@@ -623,7 +623,8 @@ function ConversationsPage() {
                               borderTopLeftRadius: !out ? 4 : undefined,
                             }}
                           >
-                            <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                            {m.media_url && <MediaBubble m={m} />}
+                            {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
                             <div className="mt-1 flex items-center justify-between gap-2">
                               <ChannelBadge channel={m.channel ?? "manual"} />
                               <p className="text-[10px] opacity-60">
