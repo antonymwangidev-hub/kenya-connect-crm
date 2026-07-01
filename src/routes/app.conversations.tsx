@@ -12,6 +12,12 @@ import {
   ArrowLeft,
   Wand2,
   FileText,
+  Paperclip,
+  X,
+  Download,
+  Play,
+  FileIcon,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -20,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { suggestReply } from "@/lib/ai.functions";
+import { createChatMediaUploadUrl, getChatMediaSignedUrl } from "@/lib/media.functions";
 import { SendTemplateModal } from "@/components/SendTemplateModal";
 
 type Tone = "polite" | "sales" | "urgent";
@@ -29,6 +36,7 @@ export const Route = createFileRoute("/app/conversations")({
 });
 
 type Channel = "manual" | "whatsapp" | "sms";
+type MediaType = "image" | "video" | "audio" | "document";
 type Conversation = {
   id: string;
   contact_id: string;
@@ -47,7 +55,13 @@ type Message = {
   content: string;
   channel: Channel;
   created_at: string;
+  media_url: string | null;
+  media_type: MediaType | null;
+  media_mime: string | null;
+  media_filename: string | null;
+  media_size: number | null;
 };
+
 
 function ChannelBadge({ channel }: { channel: Channel }) {
   if (channel === "whatsapp") {
@@ -146,10 +160,53 @@ function SessionBanner({ status }: { status: ReturnType<typeof useSessionStatus>
   );
 }
 
+function MediaBubble({ m }: { m: Message }) {
+  const signFn = useServerFn(getChatMediaSignedUrl);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!m.media_url) return;
+    let cancelled = false;
+    signFn({ data: { path: m.media_url } })
+      .then((r) => { if (!cancelled) setUrl(r.url); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [m.media_url, signFn]);
+  if (!m.media_url) return null;
+  const kind = m.media_type ?? "document";
+  if (kind === "image") {
+    return url ? (
+      <a href={url} target="_blank" rel="noreferrer">
+        <img src={url} alt={m.media_filename ?? ""} className="mb-1 max-h-64 rounded-lg object-cover" />
+      </a>
+    ) : <div className="mb-1 h-40 w-56 animate-pulse rounded-lg bg-black/10" />;
+  }
+  if (kind === "video") {
+    return url ? (
+      <video src={url} controls className="mb-1 max-h-64 rounded-lg" />
+    ) : <div className="mb-1 grid h-40 w-56 place-items-center rounded-lg bg-black/10"><Play className="h-6 w-6 opacity-60" /></div>;
+  }
+  if (kind === "audio") {
+    return url ? <audio src={url} controls className="mb-1 w-full" /> : <div className="mb-1 h-10 w-56 animate-pulse rounded bg-black/10" />;
+  }
+  return (
+    <a
+      href={url ?? "#"}
+      target="_blank"
+      rel="noreferrer"
+      className="mb-1 flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-xs hover:bg-black/10"
+    >
+      <FileIcon className="h-4 w-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{m.media_filename ?? "Attachment"}</span>
+      <Download className="h-3.5 w-3.5 opacity-60" />
+    </a>
+  );
+}
+
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
   const suggestFn = useServerFn(suggestReply);
+  const uploadUrlFn = useServerFn(createChatMediaUploadUrl);
   const [suggesting, setSuggesting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [tone, setTone] = useState<Tone>("polite");
@@ -165,6 +222,9 @@ function ConversationsPage() {
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 30;
 
@@ -292,45 +352,62 @@ function ConversationsPage() {
 
   const sessionStatus = useSessionStatus(active?.last_inbound_at ?? null);
 
+  const detectMediaType = (file: File): MediaType => {
+    if (file.type.startsWith("image/")) return "image";
+    if (file.type.startsWith("video/")) return "video";
+    if (file.type.startsWith("audio/")) return "audio";
+    return "document";
+  };
+
+  const uploadPendingFile = async (): Promise<{
+    path: string; type: MediaType; mime: string; filename: string; size: number;
+  } | null> => {
+    if (!pendingFile || !active) return null;
+    setUploading(true);
+    try {
+      const { path, token } = await uploadUrlFn({ data: { contactId: active.contact_id, filename: pendingFile.name } });
+      const { error } = await supabase.storage.from("chat-media").uploadToSignedUrl(path, token, pendingFile, {
+        contentType: pendingFile.type || "application/octet-stream",
+      });
+      if (error) throw error;
+      return {
+        path, type: detectMediaType(pendingFile), mime: pendingFile.type || "application/octet-stream",
+        filename: pendingFile.name, size: pendingFile.size,
+      };
+    } finally { setUploading(false); }
+  };
+
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!active || !draft.trim() || sending) return;
+    if (!active || sending) return;
     const content = draft.trim();
+    if (!content && !pendingFile) return;
 
     if (direction === "inbound") {
       setDraft("");
       const { error } = await supabase.from("messages").insert({
-        contact_id: active.contact_id,
-        direction: "inbound",
-        content,
-        channel: "manual",
+        contact_id: active.contact_id, direction: "inbound", content, channel: "manual",
       });
       if (error) toast.error(error.message);
       return;
     }
 
-    // Smart send: outside the 24h window, free-form WhatsApp text is rejected
-    // by Meta. Open the template picker instead of attempting a send.
     if (!sessionStatus.open) {
       toast.message("24h window closed — pick an approved template to reopen the conversation.");
       setTemplateOpen(true);
       return;
     }
 
-    setDraft("");
     setSending(true);
     try {
-      const result = await sendFn({ data: { contactId: active.contact_id, content } });
+      const media = pendingFile ? await uploadPendingFile() : null;
+      const result = await sendFn({ data: { contactId: active.contact_id, content, ...(media ? { media } : {}) } });
+      setDraft("");
+      setPendingFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success(`Sent via ${result.channel}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Send failed";
-      toast.error(msg);
-      await supabase.from("messages").insert({
-        contact_id: active.contact_id,
-        direction: "outbound",
-        content,
-        channel: "manual",
-      });
+      toast.error(err instanceof Error ? err.message : "Send failed");
     } finally {
       setSending(false);
     }
@@ -546,7 +623,8 @@ function ConversationsPage() {
                               borderTopLeftRadius: !out ? 4 : undefined,
                             }}
                           >
-                            <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                            {m.media_url && <MediaBubble m={m} />}
+                            {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
                             <div className="mt-1 flex items-center justify-between gap-2">
                               <ChannelBadge channel={m.channel ?? "manual"} />
                               <p className="text-[10px] opacity-60">
@@ -612,14 +690,51 @@ function ConversationsPage() {
                   Send AI
                 </Button>
               </div>
-              <div className="flex gap-2">
+              {pendingFile && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
+                  <FileIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{pendingFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                    className="rounded p-0.5 hover:bg-muted"
+                    aria-label="Remove attachment"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (f.size > 16 * 1024 * 1024) { toast.error("Max 16MB"); return; }
+                    setPendingFile(f);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  disabled={sending || uploading || direction === "inbound"}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach file"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
                 <Input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder={
                     sessionStatus.open || direction === "inbound"
                       ? "Type a message…"
-                      : "24h window closed — use Templates to send"
+                      : "24h window closed — use Templates"
                   }
                   className="flex-1"
                   disabled={sending}
@@ -627,6 +742,8 @@ function ConversationsPage() {
                 <Button
                   type="button"
                   variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
                   disabled={suggesting || !active}
                   title="Quick AI suggestion"
                   onClick={async () => {
@@ -645,8 +762,8 @@ function ConversationsPage() {
                 >
                   <Sparkles className="h-4 w-4" />
                 </Button>
-                <Button type="submit" disabled={!draft.trim() || sending}>
-                  <Send className="h-4 w-4" />
+                <Button type="submit" size="icon" className="h-10 w-10 shrink-0" disabled={(!draft.trim() && !pendingFile) || sending || uploading}>
+                  {sending || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
             </form>

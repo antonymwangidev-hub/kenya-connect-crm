@@ -15,13 +15,33 @@ export const getMyWhatsappConnection = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
+    // Only surface fully-linked Meta connections. Rows without a
+    // phone_number_id / waba_id are stubs from legacy manual flows and are
+    // treated as "not connected".
     const { data } = await supabase
       .from("whatsapp_connections")
       .select(SAFE_CONNECTION_COLUMNS)
-      .order("created_at", { ascending: false })
+      .eq("status", "connected")
+      .not("phone_number_id", "is", null)
+      .not("waba_id", "is", null)
+      .order("connected_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     return { connection: data ?? null };
+  });
+
+export const listMyWhatsappConnections = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data } = await supabase
+      .from("whatsapp_connections")
+      .select(SAFE_CONNECTION_COLUMNS)
+      .eq("status", "connected")
+      .not("phone_number_id", "is", null)
+      .not("waba_id", "is", null)
+      .order("connected_at", { ascending: false });
+    return { connections: data ?? [] };
   });
 
 export const getEmbeddedSignupConfig = createServerFn({ method: "GET" })

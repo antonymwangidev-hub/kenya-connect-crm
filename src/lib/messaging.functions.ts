@@ -61,17 +61,44 @@ async function resolveWhatsAppSendConfig(businessId: string) {
   return { token, phoneNumberId };
 }
 
-export async function sendWhatsApp(businessId: string, toPhone: string, content: string) {
+export type OutboundMedia = {
+  url: string; // publicly reachable (signed) URL Meta can fetch
+  type: "image" | "video" | "audio" | "document";
+  mime?: string;
+  filename?: string;
+};
+
+export async function sendWhatsApp(
+  businessId: string,
+  toPhone: string,
+  content: string,
+  media?: OutboundMedia,
+) {
   const { token, phoneNumberId } = await resolveWhatsAppSendConfig(businessId);
+  const to = toPhone.replace(/^\+/, "");
+  let body: Record<string, unknown>;
+  if (media) {
+    const mediaObj: Record<string, string> = { link: media.url };
+    if (content) mediaObj.caption = content;
+    if (media.type === "document" && media.filename) mediaObj.filename = media.filename;
+    body = {
+      messaging_product: "whatsapp",
+      to,
+      type: media.type,
+      [media.type]: mediaObj,
+    };
+  } else {
+    body = {
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body: content },
+    };
+  }
   const res = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: toPhone.replace(/^\+/, ""),
-      type: "text",
-      text: { body: content },
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`WhatsApp API ${res.status}: ${await res.text()}`);
   return res.json();
@@ -118,14 +145,25 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
     z
       .object({
         contactId: z.string().uuid(),
-        content: z.string().trim().min(1).max(4000),
+        content: z.string().trim().max(4000).default(""),
+        media: z
+          .object({
+            path: z.string().min(1).max(500),
+            type: z.enum(["image", "video", "audio", "document"]),
+            mime: z.string().max(120).optional(),
+            filename: z.string().max(200).optional(),
+            size: z.number().int().nonnegative().optional(),
+          })
+          .optional(),
+      })
+      .refine((v) => (v.content && v.content.length > 0) || v.media, {
+        message: "content or media required",
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
-    // Look up contact (RLS scopes to the user's business)
     const { data: contact, error: contactErr } = await supabase
       .from("contacts")
       .select("id,phone,business_id")
@@ -133,15 +171,34 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
       .single();
     if (contactErr || !contact) throw new Error("Contact not found");
 
+    let mediaForSend: OutboundMedia | undefined;
+    if (data.media) {
+      // Sign a temporary URL Meta can fetch to download the file. We only
+      // persist the storage path on the message row — signed URLs expire, so
+      // the UI re-signs on demand for display.
+      const { data: signed, error: signedErr } = await supabase.storage
+        .from("chat-media")
+        .createSignedUrl(data.media.path, 60 * 60);
+      if (signedErr || !signed) throw new Error(signedErr?.message ?? "Signed URL failed");
+      mediaForSend = {
+        url: signed.signedUrl,
+        type: data.media.type,
+        mime: data.media.mime,
+        filename: data.media.filename,
+      };
+    }
+
     let channel: "whatsapp" | "sms" = "whatsapp";
     let lastError: string | null = null;
 
-    // Try WhatsApp first
     try {
-      await sendWhatsApp(contact.business_id, contact.phone, data.content);
+      await sendWhatsApp(contact.business_id, contact.phone, data.content, mediaForSend);
     } catch (err) {
       lastError = err instanceof Error ? err.message : "WhatsApp failed";
-      // Fallback to Africa's Talking SMS
+      if (mediaForSend) {
+        // Media over SMS is not supported by AT; surface the WhatsApp error.
+        throw new Error(`WhatsApp send failed: ${lastError}`);
+      }
       try {
         const result = await sendAfricasTalking(contact.business_id, contact.phone, data.content);
         channel = "sms";
@@ -175,6 +232,15 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
         direction: "outbound",
         content: data.content,
         channel,
+        ...(data.media
+          ? {
+              media_url: data.media.path,
+              media_type: data.media.type,
+              media_mime: data.media.mime ?? null,
+              media_filename: data.media.filename ?? null,
+              media_size: data.media.size ?? null,
+            }
+          : {}),
       })
       .select()
       .single();
