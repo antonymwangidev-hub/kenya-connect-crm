@@ -172,16 +172,14 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
     if (contactErr || !contact) throw new Error("Contact not found");
 
     let mediaForSend: OutboundMedia | undefined;
-    let mediaPublicUrl: string | null = null;
     if (data.media) {
-      // Sign a URL Meta can fetch. Also cache it on the message row so the UI
-      // can display it without a per-render server round trip (bucket is
-      // private; the signed URL is scoped and time-limited).
+      // Sign a temporary URL Meta can fetch to download the file. We only
+      // persist the storage path on the message row — signed URLs expire, so
+      // the UI re-signs on demand for display.
       const { data: signed, error: signedErr } = await supabase.storage
         .from("chat-media")
-        .createSignedUrl(data.media.path, 60 * 60 * 24 * 7);
+        .createSignedUrl(data.media.path, 60 * 60);
       if (signedErr || !signed) throw new Error(signedErr?.message ?? "Signed URL failed");
-      mediaPublicUrl = signed.signedUrl;
       mediaForSend = {
         url: signed.signedUrl,
         type: data.media.type,
