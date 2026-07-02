@@ -254,6 +254,25 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error || !inserted) throw new Error(error?.message ?? "Insert failed");
+
+    // Also record in the multi-account table (source of truth for templates + sending).
+    if (wabaId && phoneNumberId) {
+      await supabase
+        .from("whatsapp_business_accounts")
+        .upsert(
+          {
+            business_id: biz.id,
+            business_name: displayName ?? phoneNumber ?? "WhatsApp Account",
+            waba_id: wabaId,
+            phone_number_id: phoneNumberId,
+            access_token: accessToken,
+            status: "connected",
+            meta: { phone_number: phoneNumber, source: "embedded_signup" },
+          },
+          { onConflict: "business_id,waba_id,phone_number_id" },
+        );
+    }
+
     // Re-query with safe columns only — never return access_token to the browser.
     const { data: row } = await supabase
       .from("whatsapp_connections")
