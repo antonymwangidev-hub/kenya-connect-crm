@@ -314,11 +314,9 @@ function Bullet({ children }: { children: React.ReactNode }) {
 
 function ConnectedCard({
   conn,
-  onRefresh,
   onDisconnect,
 }: {
   conn: Connection;
-  onRefresh: () => void;
   onDisconnect: () => void;
 }) {
   const copy = async (label: string, value: string | null) => {
@@ -331,7 +329,7 @@ function ConnectedCard({
     }
   };
   return (
-    <div className="space-y-5 rounded-2xl border bg-card p-5 sm:p-6">
+    <div className="space-y-4 rounded-2xl border bg-card p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Connected number</p>
@@ -353,14 +351,9 @@ function ConnectedCard({
         <IdRow label="WABA ID" value={conn.waba_id} onCopy={copy} />
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Button variant="outline" onClick={onRefresh} className="h-10">
-          <RefreshCw className="mr-2 h-4 w-4" /> Refresh status
-        </Button>
-        <Button variant="destructive" onClick={onDisconnect} className="h-10">
-          <PhoneOff className="mr-2 h-4 w-4" /> Disconnect
-        </Button>
-      </div>
+      <Button variant="destructive" onClick={onDisconnect} className="h-10 w-full">
+        <PhoneOff className="mr-2 h-4 w-4" /> Disconnect this account
+      </Button>
     </div>
   );
 }
