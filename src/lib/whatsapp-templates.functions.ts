@@ -36,7 +36,8 @@ const SAFE_ACCOUNT_COLS =
   "id,business_id,business_name,waba_id,phone_number_id,status,created_at,updated_at";
 
 async function loadAccountForUser(
-  supabase: Awaited<ReturnType<typeof requireSupabaseAuth.serverAction>>["supabase"] | any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   userId: string,
   accountId: string,
 ): Promise<AccountRow> {
