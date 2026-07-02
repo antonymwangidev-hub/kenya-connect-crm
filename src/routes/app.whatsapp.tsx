@@ -92,10 +92,10 @@ function loadFbSdk(): Promise<void> {
 }
 
 function WhatsappPage() {
-  const fetchFn = useServerFn(getMyWhatsappConnection);
+  const fetchFn = useServerFn(listMyWhatsappConnections);
   const disconnectFn = useServerFn(disconnectWhatsapp);
   const exchangeFn = useServerFn(exchangeWhatsappSignup);
-  const [conn, setConn] = useState<Connection | null>(null);
+  const [conns, setConns] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const signupDataRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
@@ -103,8 +103,8 @@ function WhatsappPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { connection } = await fetchFn();
-      setConn((connection as Connection | null) ?? null);
+      const { connections } = await fetchFn();
+      setConns((connections as Connection[] | null) ?? []);
     } finally {
       setLoading(false);
     }
@@ -114,7 +114,6 @@ function WhatsappPage() {
     void load();
   }, [load]);
 
-  // Capture WABA / phone-number IDs delivered via postMessage from the popup.
   useEffect(() => {
     function onMessage(ev: MessageEvent) {
       if (typeof ev.data !== "string") return;
@@ -164,7 +163,7 @@ function WhatsappPage() {
                 "Signed up, but Meta didn't return your phone-number ID. Refresh in a moment.",
               );
             } else {
-              toast.success("WhatsApp connected");
+              toast.success("WhatsApp account connected");
             }
             await load();
           } catch (e: unknown) {
@@ -186,15 +185,9 @@ function WhatsappPage() {
     }
   };
 
-  const disconnect = async () => {
-    if (!conn) return;
-    if (
-      !confirm(
-        "Disconnect WhatsApp? Customers will stop being able to reach you until you reconnect.",
-      )
-    )
-      return;
-    await disconnectFn({ data: { connectionId: conn.id } });
+  const disconnect = async (id: string) => {
+    if (!confirm("Disconnect this WhatsApp account?")) return;
+    await disconnectFn({ data: { connectionId: id } });
     toast.success("Disconnected");
     void load();
   };
@@ -203,19 +196,40 @@ function WhatsappPage() {
     <div className="mx-auto max-w-2xl space-y-5 px-4 py-6">
       <header>
         <h1 className="flex items-center gap-2 text-lg font-bold sm:text-xl">
-          <MessageCircle className="h-5 w-5 text-primary" /> WhatsApp
+          <MessageCircle className="h-5 w-5 text-primary" /> WhatsApp Accounts
         </h1>
         <p className="text-sm text-muted-foreground">
-          Connect your WhatsApp Business number so customers can message you directly from the CRM.
+          Connect one or more WhatsApp Business Accounts. Each account has its own templates, WABA ID and phone number.
         </p>
       </header>
 
       {loading ? (
         <div className="h-56 animate-pulse rounded-2xl border bg-muted/30" />
-      ) : !conn ? (
+      ) : conns.length === 0 ? (
         <NotConnectedCard connecting={connecting} onEmbedded={launchEmbeddedSignup} />
       ) : (
-        <ConnectedCard conn={conn} onRefresh={load} onDisconnect={disconnect} />
+        <>
+          <div className="space-y-3">
+            {conns.map((c) => (
+              <ConnectedCard key={c.id} conn={c} onDisconnect={() => disconnect(c.id)} />
+            ))}
+          </div>
+          <Button
+            onClick={launchEmbeddedSignup}
+            disabled={connecting}
+            variant="outline"
+            className="h-11 w-full"
+          >
+            {connecting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening Meta sign-up…</>
+            ) : (
+              <><Facebook className="mr-2 h-4 w-4" /> Connect another WhatsApp account</>
+            )}
+          </Button>
+          <Button variant="ghost" onClick={load} className="w-full">
+            <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+          </Button>
+        </>
       )}
     </div>
   );
