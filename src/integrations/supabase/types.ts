@@ -824,6 +824,53 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_business_accounts: {
+        Row: {
+          access_token: string | null
+          business_id: string
+          business_name: string
+          created_at: string
+          id: string
+          meta: Json
+          phone_number_id: string
+          status: string
+          updated_at: string
+          waba_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          business_id: string
+          business_name: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          phone_number_id: string
+          status?: string
+          updated_at?: string
+          waba_id: string
+        }
+        Update: {
+          access_token?: string | null
+          business_id?: string
+          business_name?: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          phone_number_id?: string
+          status?: string
+          updated_at?: string
+          waba_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_business_accounts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_connections: {
         Row: {
           business_id: string
@@ -909,6 +956,7 @@ export type Database = {
       }
       whatsapp_templates: {
         Row: {
+          business_account_id: string
           business_id: string
           category: string | null
           components: Json
@@ -923,6 +971,7 @@ export type Database = {
           waba_id: string | null
         }
         Insert: {
+          business_account_id: string
           business_id: string
           category?: string | null
           components?: Json
@@ -937,6 +986,7 @@ export type Database = {
           waba_id?: string | null
         }
         Update: {
+          business_account_id?: string
           business_id?: string
           category?: string | null
           components?: Json
@@ -951,6 +1001,13 @@ export type Database = {
           waba_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_templates_business_account_id_fkey"
+            columns: ["business_account_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_business_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_templates_business_id_fkey"
             columns: ["business_id"]
