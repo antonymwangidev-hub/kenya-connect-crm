@@ -21,98 +21,61 @@ type MetaTemplate = {
   components?: WaComponent[];
 };
 
-type AccountRow = {
-  id: string;
-  business_id: string;
-  business_name: string;
-  waba_id: string;
-  phone_number_id: string;
-  access_token: string | null;
-  status: string;
-};
-
-// SAFE — never returns access_token to client.
-const SAFE_ACCOUNT_COLS =
-  "id,business_id,business_name,waba_id,phone_number_id,status,created_at,updated_at";
-
-async function loadAccountForUser(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  userId: string,
-  accountId: string,
-): Promise<AccountRow> {
-  // Verify business ownership via join
-  const { data: biz } = await supabase
-    .from("businesses").select("id").eq("owner_id", userId);
-  const bizIds = (biz as Array<{ id: string }> | null)?.map((b) => b.id) ?? [];
-  if (bizIds.length === 0) throw new Error("Business not found");
-
-  const { data, error } = await supabase
-    .from("whatsapp_business_accounts")
-    .select("id,business_id,business_name,waba_id,phone_number_id,access_token,status")
-    .eq("id", accountId)
-    .in("business_id", bizIds)
+async function resolveWaConfig(businessId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: conn } = await supabaseAdmin
+    .from("whatsapp_connections")
+    .select("phone_number_id,waba_id,meta")
+    .eq("business_id", businessId)
+    .eq("status", "connected")
+    .order("connected_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  if (error || !data) throw new Error("WhatsApp account not found");
-  return data as AccountRow;
+  const { data: cred } = await supabaseAdmin
+    .from("channel_credentials")
+    .select("credentials,is_active")
+    .eq("business_id", businessId)
+    .eq("provider", "whatsapp")
+    .maybeSingle();
+  const credBag = (cred?.is_active ? (cred.credentials as Record<string, string>) : null) ?? {};
+  const meta = (conn?.meta ?? {}) as Record<string, string>;
+  const token = meta.access_token ?? credBag.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
+  const wabaId = conn?.waba_id ?? credBag.waba_id ?? process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+  const phoneNumberId = conn?.phone_number_id ?? credBag.phone_number_id ?? process.env.WHATSAPP_PHONE_NUMBER_ID;
+  return { token, wabaId, phoneNumberId };
 }
 
-// ---------- Accounts ----------
-
-export const listWhatsappAccounts = createServerFn({ method: "GET" })
+export const listWhatsappTemplates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const { data, error } = await supabase
-      .from("whatsapp_business_accounts")
-      .select(SAFE_ACCOUNT_COLS)
-      .order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
-    return { accounts: data ?? [] };
-  });
-
-// ---------- Templates ----------
-
-export const listWhatsappTemplates = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ accountId: z.string().uuid() }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const { data: rows, error } = await supabase
       .from("whatsapp_templates")
       .select("*")
-      .eq("business_account_id", data.accountId)
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
-    return { templates: rows ?? [] };
+    return { templates: data ?? [] };
   });
 
 export const syncWhatsappTemplates = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ accountId: z.string().uuid() }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const account = await loadAccountForUser(supabase, userId, data.accountId);
+    const { data: biz } = await supabase
+      .from("businesses").select("id").eq("owner_id", userId).limit(1).single();
+    if (!biz) throw new Error("Business not found");
 
-    const token = account.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
-    if (!token) {
+    const { token, wabaId } = await resolveWaConfig(biz.id);
+    if (!token || !wabaId) {
       await supabase.from("whatsapp_template_sync_logs").insert({
-        business_id: account.business_id, status: "error", error: "Missing access token",
+        business_id: biz.id, status: "error", error: "WhatsApp not connected",
       });
-      throw new Error("This WhatsApp account has no access token. Reconnect via Meta Embedded Signup.");
-    }
-    if (!account.waba_id) {
-      throw new Error("This account has no WABA ID.");
+      throw new Error("Connect WhatsApp first (missing access token or WABA ID).");
     }
 
     const all: MetaTemplate[] = [];
-    // ALWAYS use the SELECTED account's WABA — never a global one.
     let url: string | null =
-      `https://graph.facebook.com/${GRAPH_VERSION}/${account.waba_id}/message_templates?limit=200&fields=name,language,status,category,components,id`;
+      `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates?limit=200&fields=name,language,status,category,components,id`;
     try {
       while (url) {
         const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -125,15 +88,14 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Sync failed";
       await supabase.from("whatsapp_template_sync_logs").insert({
-        business_id: account.business_id, status: "error", error: msg.slice(0, 500),
+        business_id: biz.id, status: "error", error: msg.slice(0, 500),
       });
       throw new Error(msg);
     }
 
     const rows = all.map((t) => ({
-      business_id: account.business_id,
-      business_account_id: account.id,
-      waba_id: account.waba_id,
+      business_id: biz.id,
+      waba_id: wabaId,
       meta_template_id: t.id,
       name: t.name,
       language: t.language,
@@ -146,12 +108,12 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
     if (rows.length > 0) {
       const { error: upErr } = await supabase
         .from("whatsapp_templates")
-        .upsert(rows, { onConflict: "business_account_id,name,language" });
+        .upsert(rows, { onConflict: "business_id,name,language" });
       if (upErr) throw new Error(upErr.message);
     }
 
     await supabase.from("whatsapp_template_sync_logs").insert({
-      business_id: account.business_id, status: "ok", synced_count: rows.length,
+      business_id: biz.id, status: "ok", synced_count: rows.length,
     });
 
     return { count: rows.length };
@@ -177,7 +139,7 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
 
     const { data: contact, error: cErr } = await supabase
       .from("contacts").select("id,phone,business_id").eq("id", data.contactId).single();
@@ -187,18 +149,9 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       .from("whatsapp_templates").select("*").eq("id", data.templateId).single();
     if (tErr || !tpl) throw new Error("Template not found");
     if (tpl.status !== "APPROVED") throw new Error("Template is not approved");
-    if (!tpl.business_account_id) throw new Error("Template is not linked to a WhatsApp account");
 
-    // The template's own account decides the WABA + phone number used to send.
-    const account = await loadAccountForUser(supabase, userId, tpl.business_account_id);
-    if (account.business_id !== contact.business_id) {
-      throw new Error("Template belongs to a different workspace than the contact");
-    }
-
-    const token = account.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
-    if (!token || !account.phone_number_id) {
-      throw new Error("WhatsApp account is not fully configured");
-    }
+    const { token, phoneNumberId } = await resolveWaConfig(contact.business_id);
+    if (!token || !phoneNumberId) throw new Error("WhatsApp not configured for this business");
 
     // Build components payload
     const components: Array<Record<string, unknown>> = [];
@@ -246,8 +199,7 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       },
     };
 
-    // Send via the SELECTED account's phone_number_id (belongs to the same WABA as the template).
-    const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${account.phone_number_id}/messages`, {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -258,7 +210,7 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       try {
         const j = JSON.parse(text) as { error?: { code?: number; message?: string } };
         const code = j.error?.code;
-        if (code === 190) friendly = "WhatsApp access token expired. Reconnect this account.";
+        if (code === 190) friendly = "WhatsApp access token expired. Reconnect WhatsApp.";
         else if (code === 132000 || code === 132001 || code === 132005) friendly = "Template parameters do not match the approved template.";
         else if (code === 131026) friendly = "Recipient is not opted in or unreachable on WhatsApp.";
         else if (code === 130429 || code === 80007) friendly = "WhatsApp rate limit reached. Try again shortly.";
@@ -270,6 +222,7 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
     try { json = JSON.parse(text); } catch { /* ignore */ }
     const providerId = json.messages?.[0]?.id ?? null;
 
+    // Render preview body for the inbox
     const bodyComp = tplComponents.find((c) => c.type === "BODY");
     let preview = bodyComp?.text ?? `[Template] ${tpl.name}`;
     (data.variables.body ?? []).forEach((v, i) => {

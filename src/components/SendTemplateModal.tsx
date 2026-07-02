@@ -6,16 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, ArrowLeft, Send } from "lucide-react";
 import { toast } from "sonner";
-import {
-  listWhatsappTemplates,
-  sendWhatsappTemplate,
-  syncWhatsappTemplates,
-  listWhatsappAccounts,
-} from "@/lib/whatsapp-templates.functions";
-
-const SELECTED_ACCOUNT_KEY = "wa.selectedAccountId";
-type WaAccount = { id: string; business_name: string; waba_id: string; phone_number_id: string };
-
+import { listWhatsappTemplates, sendWhatsappTemplate, syncWhatsappTemplates } from "@/lib/whatsapp-templates.functions";
 
 export type WaTpl = {
   id: string;
@@ -68,10 +59,7 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
   const listFn = useServerFn(listWhatsappTemplates);
   const syncFn = useServerFn(syncWhatsappTemplates);
   const sendFn = useServerFn(sendWhatsappTemplate);
-  const accountsFn = useServerFn(listWhatsappAccounts);
 
-  const [accounts, setAccounts] = useState<WaAccount[]>([]);
-  const [accountId, setAccountId] = useState<string>("");
   const [templates, setTemplates] = useState<WaTpl[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -84,46 +72,17 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
   const [btnVals, setBtnVals] = useState<Record<number, string>>({});
   const [sending, setSending] = useState(false);
 
-  // On open: load accounts, pick default, load templates.
   useEffect(() => {
     if (!open) return;
     setStep("select");
     setSelected(null);
     setQ("");
     setLoading(true);
-    (async () => {
-      try {
-        const { accounts: rows } = await accountsFn();
-        const list = (rows as unknown as WaAccount[]) ?? [];
-        setAccounts(list);
-        const stored = typeof window !== "undefined" ? localStorage.getItem(SELECTED_ACCOUNT_KEY) : null;
-        const initial = list.find((a) => a.id === stored)?.id ?? list[0]?.id ?? "";
-        setAccountId(initial);
-        if (initial) {
-          const { templates: t } = await listFn({ data: { accountId: initial } });
-          setTemplates((t as unknown as WaTpl[]) ?? []);
-        } else {
-          setTemplates([]);
-        }
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Failed to load");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [open, listFn, accountsFn]);
-
-  // Reload templates when account changes.
-  useEffect(() => {
-    if (!open || !accountId) return;
-    if (typeof window !== "undefined") localStorage.setItem(SELECTED_ACCOUNT_KEY, accountId);
-    setLoading(true);
-    listFn({ data: { accountId } })
+    listFn()
       .then(({ templates: t }) => setTemplates((t as unknown as WaTpl[]) ?? []))
       .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
-  }, [accountId, open, listFn]);
-
+  }, [open, listFn]);
 
   const approved = useMemo(() => templates.filter((t) => t.status.toUpperCase() === "APPROVED"), [templates]);
   const categories = useMemo(
@@ -152,12 +111,11 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
   };
 
   const handleSync = async () => {
-    if (!accountId) return;
     setSyncing(true);
     try {
-      const { count } = await syncFn({ data: { accountId } });
+      const { count } = await syncFn();
       toast.success(`Synced ${count} templates`);
-      const { templates: t } = await listFn({ data: { accountId } });
+      const { templates: t } = await listFn();
       setTemplates((t as unknown as WaTpl[]) ?? []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sync failed");
@@ -215,27 +173,6 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
 
         {step === "select" ? (
           <div className="space-y-3">
-            {accounts.length > 1 && (
-              <div>
-                <label className="mb-1 block text-[10px] font-semibold uppercase text-muted-foreground">
-                  WhatsApp Account
-                </label>
-                <select
-                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>{a.business_name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {accounts.length === 0 && !loading && (
-              <p className="rounded-lg border bg-card p-3 text-center text-sm text-muted-foreground">
-                No WhatsApp accounts connected. Connect one from WhatsApp settings first.
-              </p>
-            )}
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[160px]">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -245,11 +182,10 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
                 <option value="ALL">All categories</option>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <Button onClick={handleSync} disabled={syncing || !accountId} size="sm" variant="outline">
+              <Button onClick={handleSync} disabled={syncing} size="sm" variant="outline">
                 {syncing ? "Syncing…" : "Refresh"}
               </Button>
             </div>
-
 
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
               {loading ? (

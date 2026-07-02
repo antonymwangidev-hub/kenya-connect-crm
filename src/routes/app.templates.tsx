@@ -8,12 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { FileText, Plus, Trash2, RefreshCw, MessageSquare, Search, AlertCircle } from "lucide-react";
-import {
-  listWhatsappTemplates,
-  syncWhatsappTemplates,
-  listWhatsappAccounts,
-} from "@/lib/whatsapp-templates.functions";
+import { FileText, Plus, Trash2, RefreshCw, MessageSquare, Search } from "lucide-react";
+import { listWhatsappTemplates, syncWhatsappTemplates } from "@/lib/whatsapp-templates.functions";
 
 export const Route = createFileRoute("/app/templates")({
   component: TemplatesPage,
@@ -22,8 +18,6 @@ export const Route = createFileRoute("/app/templates")({
 type Tpl = { id: string; name: string; body: string; category: string };
 type WaTpl = {
   id: string;
-  business_account_id: string;
-  waba_id: string | null;
   name: string;
   language: string;
   category: string | null;
@@ -31,15 +25,6 @@ type WaTpl = {
   components: Array<{ type: string; format?: string; text?: string; buttons?: unknown[] }>;
   last_synced_at: string;
 };
-type WaAccount = {
-  id: string;
-  business_name: string;
-  waba_id: string;
-  phone_number_id: string;
-  status: string;
-};
-
-const SELECTED_ACCOUNT_KEY = "wa.selectedAccountId";
 
 function StatusBadge({ status }: { status: string }) {
   const s = status.toUpperCase();
@@ -62,19 +47,16 @@ function TemplatesPage() {
   const { businessId } = useAuth();
   const listFn = useServerFn(listWhatsappTemplates);
   const syncFn = useServerFn(syncWhatsappTemplates);
-  const accountsFn = useServerFn(listWhatsappAccounts);
 
-  const [accounts, setAccounts] = useState<WaAccount[]>([]);
-  const [accountId, setAccountId] = useState<string>("");
-  const [accountsLoading, setAccountsLoading] = useState(true);
-
+  // Local "quick reply" templates (existing message_templates table)
   const [list, setList] = useState<Tpl[]>([]);
   const [name, setName] = useState("");
   const [body, setBody] = useState("");
   const [category, setCategory] = useState("general");
 
+  // WhatsApp templates
   const [wa, setWa] = useState<WaTpl[]>([]);
-  const [waLoading, setWaLoading] = useState(false);
+  const [waLoading, setWaLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [q, setQ] = useState("");
   const [fStatus, setFStatus] = useState<string>("ALL");
@@ -91,30 +73,10 @@ function TemplatesPage() {
       .then(({ data }) => setList((data as Tpl[]) ?? []));
   };
 
-  // Load accounts, pick a default (persisted or first).
-  useEffect(() => {
-    (async () => {
-      setAccountsLoading(true);
-      try {
-        const { accounts: rows } = await accountsFn();
-        const list = (rows as unknown as WaAccount[]) ?? [];
-        setAccounts(list);
-        const stored = typeof window !== "undefined" ? localStorage.getItem(SELECTED_ACCOUNT_KEY) : null;
-        const initial = list.find((a) => a.id === stored)?.id ?? list[0]?.id ?? "";
-        setAccountId(initial);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Failed to load WhatsApp accounts");
-      } finally {
-        setAccountsLoading(false);
-      }
-    })();
-  }, [accountsFn]);
-
-  const loadWa = async (id: string) => {
-    if (!id) { setWa([]); return; }
+  const loadWa = async () => {
     setWaLoading(true);
     try {
-      const { templates } = await listFn({ data: { accountId: id } });
+      const { templates } = await listFn();
       setWa((templates as unknown as WaTpl[]) ?? []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to load templates");
@@ -124,19 +86,14 @@ function TemplatesPage() {
   };
 
   useEffect(loadLocal, [businessId]);
-  useEffect(() => {
-    if (!accountId) return;
-    if (typeof window !== "undefined") localStorage.setItem(SELECTED_ACCOUNT_KEY, accountId);
-    void loadWa(accountId);
-  }, [accountId]);
+  useEffect(() => { loadWa(); }, []);
 
   const sync = async () => {
-    if (!accountId) return;
     setSyncing(true);
     try {
-      const { count } = await syncFn({ data: { accountId } });
+      const { count } = await syncFn();
       toast.success(`Synced ${count} templates from Meta`);
-      await loadWa(accountId);
+      await loadWa();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sync failed");
     } finally {
@@ -176,58 +133,21 @@ function TemplatesPage() {
     });
   }, [wa, q, fStatus, fLang, fCat]);
 
-  const selectedAccount = accounts.find((a) => a.id === accountId) ?? null;
-
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-6">
+      {/* WhatsApp Template Library */}
       <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="flex items-center gap-2 text-xl font-bold">
             <MessageSquare className="h-5 w-5 text-primary" /> WhatsApp Template Library
           </h1>
-          <Button onClick={sync} disabled={syncing || !accountId} size="sm" className="ml-auto gap-1">
+          <Button onClick={sync} disabled={syncing} size="sm" className="ml-auto gap-1">
             <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Syncing…" : "Sync from Meta"}
           </Button>
         </div>
-
-        {/* Account selector */}
-        <div className="rounded-2xl border bg-card p-3">
-          <label className="mb-1.5 block text-[11px] font-semibold uppercase text-muted-foreground">
-            WhatsApp Business Account
-          </label>
-          {accountsLoading ? (
-            <Skeleton className="h-10 w-full" />
-          ) : accounts.length === 0 ? (
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <AlertCircle className="mt-0.5 h-4 w-4 text-amber-500" />
-              <span>No WhatsApp accounts connected. Go to WhatsApp settings and connect via Meta Embedded Signup.</span>
-            </div>
-          ) : (
-            <>
-              <select
-                className="h-10 w-full rounded-md border bg-background px-2 text-sm"
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.business_name} — WABA {a.waba_id.slice(0, 10)}…
-                  </option>
-                ))}
-              </select>
-              {selectedAccount && (
-                <p className="mt-1.5 text-[11px] text-muted-foreground">
-                  WABA: <span className="font-mono">{selectedAccount.waba_id}</span> · Phone#{" "}
-                  <span className="font-mono">{selectedAccount.phone_number_id}</span>
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
         <p className="text-sm text-muted-foreground">
-          Templates below belong only to the selected account. Switch accounts to view a different WABA's templates.
+          Approved Meta templates can be sent at any time. Pending and rejected templates are shown for visibility.
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -256,14 +176,10 @@ function TemplatesPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
           </div>
-        ) : !accountId ? (
-          <div className="rounded-2xl border bg-card p-6 text-center text-sm text-muted-foreground">
-            Select a WhatsApp account to view its templates.
-          </div>
         ) : filtered.length === 0 ? (
           <div className="rounded-2xl border bg-card p-6 text-center text-sm text-muted-foreground">
             {wa.length === 0
-              ? "No templates yet for this account. Click \"Sync from Meta\" to import approved templates."
+              ? "No templates yet. Click \"Sync from Meta\" to import your approved templates."
               : "No templates match the current filters."}
           </div>
         ) : (
@@ -282,7 +198,9 @@ function TemplatesPage() {
                     </div>
                     <StatusBadge status={t.status} />
                   </div>
-                  {header?.text && <p className="text-xs font-medium">{header.text}</p>}
+                  {header?.text && (
+                    <p className="text-xs font-medium">{header.text}</p>
+                  )}
                   {header?.format && header.format !== "TEXT" && (
                     <p className="text-[11px] uppercase text-muted-foreground">{header.format} header</p>
                   )}
@@ -298,6 +216,7 @@ function TemplatesPage() {
         )}
       </section>
 
+      {/* Local quick-reply templates */}
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-lg font-bold">
           <FileText className="h-5 w-5" /> Quick reply templates
