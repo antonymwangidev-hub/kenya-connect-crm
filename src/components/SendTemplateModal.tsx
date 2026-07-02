@@ -215,6 +215,27 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
 
         {step === "select" ? (
           <div className="space-y-3">
+            {accounts.length > 1 && (
+              <div>
+                <label className="mb-1 block text-[10px] font-semibold uppercase text-muted-foreground">
+                  WhatsApp Account
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.business_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {accounts.length === 0 && !loading && (
+              <p className="rounded-lg border bg-card p-3 text-center text-sm text-muted-foreground">
+                No WhatsApp accounts connected. Connect one from WhatsApp settings first.
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[160px]">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -224,10 +245,11 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
                 <option value="ALL">All categories</option>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <Button onClick={handleSync} disabled={syncing} size="sm" variant="outline">
+              <Button onClick={handleSync} disabled={syncing || !accountId} size="sm" variant="outline">
                 {syncing ? "Syncing…" : "Refresh"}
               </Button>
             </div>
+
 
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
               {loading ? (
