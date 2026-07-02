@@ -152,11 +152,12 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
   };
 
   const handleSync = async () => {
+    if (!accountId) return;
     setSyncing(true);
     try {
-      const { count } = await syncFn();
+      const { count } = await syncFn({ data: { accountId } });
       toast.success(`Synced ${count} templates`);
-      const { templates: t } = await listFn();
+      const { templates: t } = await listFn({ data: { accountId } });
       setTemplates((t as unknown as WaTpl[]) ?? []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sync failed");
