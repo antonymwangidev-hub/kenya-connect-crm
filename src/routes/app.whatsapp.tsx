@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  getMyWhatsappConnection,
+  listMyWhatsappConnections,
   disconnectWhatsapp,
   exchangeWhatsappSignup,
 } from "@/lib/whatsapp.functions";
