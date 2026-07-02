@@ -6,7 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, ArrowLeft, Send } from "lucide-react";
 import { toast } from "sonner";
-import { listWhatsappTemplates, sendWhatsappTemplate, syncWhatsappTemplates } from "@/lib/whatsapp-templates.functions";
+import {
+  listWhatsappTemplates,
+  sendWhatsappTemplate,
+  syncWhatsappTemplates,
+  listWhatsappAccounts,
+} from "@/lib/whatsapp-templates.functions";
+
+const SELECTED_ACCOUNT_KEY = "wa.selectedAccountId";
+type WaAccount = { id: string; business_name: string; waba_id: string; phone_number_id: string };
+
 
 export type WaTpl = {
   id: string;
