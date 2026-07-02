@@ -68,7 +68,10 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
   const listFn = useServerFn(listWhatsappTemplates);
   const syncFn = useServerFn(syncWhatsappTemplates);
   const sendFn = useServerFn(sendWhatsappTemplate);
+  const accountsFn = useServerFn(listWhatsappAccounts);
 
+  const [accounts, setAccounts] = useState<WaAccount[]>([]);
+  const [accountId, setAccountId] = useState<string>("");
   const [templates, setTemplates] = useState<WaTpl[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -81,17 +84,46 @@ export function SendTemplateModal({ open, onOpenChange, contactId, contactName, 
   const [btnVals, setBtnVals] = useState<Record<number, string>>({});
   const [sending, setSending] = useState(false);
 
+  // On open: load accounts, pick default, load templates.
   useEffect(() => {
     if (!open) return;
     setStep("select");
     setSelected(null);
     setQ("");
     setLoading(true);
-    listFn()
+    (async () => {
+      try {
+        const { accounts: rows } = await accountsFn();
+        const list = (rows as unknown as WaAccount[]) ?? [];
+        setAccounts(list);
+        const stored = typeof window !== "undefined" ? localStorage.getItem(SELECTED_ACCOUNT_KEY) : null;
+        const initial = list.find((a) => a.id === stored)?.id ?? list[0]?.id ?? "";
+        setAccountId(initial);
+        if (initial) {
+          const { templates: t } = await listFn({ data: { accountId: initial } });
+          setTemplates((t as unknown as WaTpl[]) ?? []);
+        } else {
+          setTemplates([]);
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [open, listFn, accountsFn]);
+
+  // Reload templates when account changes.
+  useEffect(() => {
+    if (!open || !accountId) return;
+    if (typeof window !== "undefined") localStorage.setItem(SELECTED_ACCOUNT_KEY, accountId);
+    setLoading(true);
+    listFn({ data: { accountId } })
       .then(({ templates: t }) => setTemplates((t as unknown as WaTpl[]) ?? []))
       .catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
-  }, [open, listFn]);
+  }, [accountId, open, listFn]);
+
 
   const approved = useMemo(() => templates.filter((t) => t.status.toUpperCase() === "APPROVED"), [templates]);
   const categories = useMemo(
