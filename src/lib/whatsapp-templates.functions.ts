@@ -121,12 +121,12 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const account = await loadAccountForUser(supabase, userId, data.accountId);
 
-    const token = account.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
+    const { token, source: tokenSource } = resolveWabaToken(account.access_token);
     if (!token) {
       await supabase.from("whatsapp_template_sync_logs").insert({
         business_id: account.business_id, status: "error", error: "Missing access token",
       });
-      throw new Error("This WhatsApp account has no access token. Reconnect via Meta Embedded Signup.");
+      throw new Error("No WhatsApp access token available (env WHATSAPP_ACCESS_TOKEN missing and account has none).");
     }
     if (!account.waba_id) {
       throw new Error("This account has no WABA ID.");
@@ -137,9 +137,19 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
     let url: string | null =
       `https://graph.facebook.com/${GRAPH_VERSION}/${account.waba_id}/message_templates?limit=200&fields=name,language,status,category,components,id`;
     try {
+      // Masked debug log — never prints the full token.
+      console.log("[wa-template-sync]", {
+        wabaId: account.waba_id,
+        phoneNumberId: account.phone_number_id,
+        tokenSource,
+        token: maskToken(token),
+        graphVersion: GRAPH_VERSION,
+        initialUrl: url,
+      });
       while (url) {
         const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         const txt = await res.text();
+        console.log("[wa-template-sync:response]", { status: res.status, ok: res.ok, bodyPreview: txt.slice(0, 160) });
         if (!res.ok) throw new Error(`Meta API ${res.status}: ${txt.slice(0, 200)}`);
         const json: { data?: MetaTemplate[]; paging?: { next?: string } } = JSON.parse(txt);
         all.push(...(json.data ?? []));
