@@ -23,6 +23,7 @@ const PUBLIC_FIELDS: Record<ProviderName, string[]> = {
   mpesa: ["shortcode", "till", "paybill"],
 };
 
+
 const SECRET_FIELDS: Record<ProviderName, string[]> = {
   whatsapp: ["access_token", "verify_token", "app_secret"],
   africastalking: ["api_key"],
