@@ -2,7 +2,30 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const GRAPH_VERSION = "v23.0";
+const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
+
+function maskToken(t: string | null | undefined) {
+  if (!t) return { present: false };
+  return { present: true, length: t.length, prefix: t.slice(0, 6), suffix: t.slice(-4) };
+}
+
+/**
+ * Resolve the access token for Graph API calls against a WABA.
+ *
+ * IMPORTANT: prefer the permanent System User token from env
+ * (`WHATSAPP_ACCESS_TOKEN`) over any token stored on the account row.
+ * Tokens returned by Meta's Embedded Signup `oauth/access_token` exchange
+ * are short-lived user tokens and Meta invalidates them with
+ * `code 190 / subcode 467 "user logged out"` — which was the root cause
+ * of template sync failures while messaging kept working (messaging
+ * already falls through to the env System User token).
+ */
+function resolveWabaToken(accountToken: string | null | undefined) {
+  const envToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim() || null;
+  if (envToken) return { token: envToken, source: "env:WHATSAPP_ACCESS_TOKEN" as const };
+  if (accountToken) return { token: accountToken, source: "whatsapp_business_accounts.access_token" as const };
+  return { token: null, source: "none" as const };
+}
 
 type WaComponent = {
   type: string;
@@ -98,12 +121,12 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const account = await loadAccountForUser(supabase, userId, data.accountId);
 
-    const token = account.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
+    const { token, source: tokenSource } = resolveWabaToken(account.access_token);
     if (!token) {
       await supabase.from("whatsapp_template_sync_logs").insert({
         business_id: account.business_id, status: "error", error: "Missing access token",
       });
-      throw new Error("This WhatsApp account has no access token. Reconnect via Meta Embedded Signup.");
+      throw new Error("No WhatsApp access token available (env WHATSAPP_ACCESS_TOKEN missing and account has none).");
     }
     if (!account.waba_id) {
       throw new Error("This account has no WABA ID.");
@@ -114,9 +137,19 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
     let url: string | null =
       `https://graph.facebook.com/${GRAPH_VERSION}/${account.waba_id}/message_templates?limit=200&fields=name,language,status,category,components,id`;
     try {
+      // Masked debug log — never prints the full token.
+      console.log("[wa-template-sync]", {
+        wabaId: account.waba_id,
+        phoneNumberId: account.phone_number_id,
+        tokenSource,
+        token: maskToken(token),
+        graphVersion: GRAPH_VERSION,
+        initialUrl: url,
+      });
       while (url) {
         const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         const txt = await res.text();
+        console.log("[wa-template-sync:response]", { status: res.status, ok: res.ok, bodyPreview: txt.slice(0, 160) });
         if (!res.ok) throw new Error(`Meta API ${res.status}: ${txt.slice(0, 200)}`);
         const json: { data?: MetaTemplate[]; paging?: { next?: string } } = JSON.parse(txt);
         all.push(...(json.data ?? []));
@@ -195,10 +228,17 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       throw new Error("Template belongs to a different workspace than the contact");
     }
 
-    const token = account.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
+    const { token, source: tokenSource } = resolveWabaToken(account.access_token);
     if (!token || !account.phone_number_id) {
       throw new Error("WhatsApp account is not fully configured");
     }
+    console.log("[wa-template-send]", {
+      wabaId: account.waba_id,
+      phoneNumberId: account.phone_number_id,
+      tokenSource,
+      token: maskToken(token),
+      graphVersion: GRAPH_VERSION,
+    });
 
     // Build components payload
     const components: Array<Record<string, unknown>> = [];
