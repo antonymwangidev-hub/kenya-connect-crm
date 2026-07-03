@@ -2,7 +2,30 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const GRAPH_VERSION = "v23.0";
+const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
+
+function maskToken(t: string | null | undefined) {
+  if (!t) return { present: false };
+  return { present: true, length: t.length, prefix: t.slice(0, 6), suffix: t.slice(-4) };
+}
+
+/**
+ * Resolve the access token for Graph API calls against a WABA.
+ *
+ * IMPORTANT: prefer the permanent System User token from env
+ * (`WHATSAPP_ACCESS_TOKEN`) over any token stored on the account row.
+ * Tokens returned by Meta's Embedded Signup `oauth/access_token` exchange
+ * are short-lived user tokens and Meta invalidates them with
+ * `code 190 / subcode 467 "user logged out"` — which was the root cause
+ * of template sync failures while messaging kept working (messaging
+ * already falls through to the env System User token).
+ */
+function resolveWabaToken(accountToken: string | null | undefined) {
+  const envToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim() || null;
+  if (envToken) return { token: envToken, source: "env:WHATSAPP_ACCESS_TOKEN" as const };
+  if (accountToken) return { token: accountToken, source: "whatsapp_business_accounts.access_token" as const };
+  return { token: null, source: "none" as const };
+}
 
 type WaComponent = {
   type: string;
