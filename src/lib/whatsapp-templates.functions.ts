@@ -10,20 +10,53 @@ function maskToken(t: string | null | undefined) {
 }
 
 /**
- * Resolve the access token for Graph API calls against a WABA.
+ * Resolve the access token for Graph API calls against the selected WABA.
  *
- * IMPORTANT: prefer the permanent System User token from env
- * (`WHATSAPP_ACCESS_TOKEN`) over any token stored on the account row.
- * Tokens returned by Meta's Embedded Signup `oauth/access_token` exchange
- * are short-lived user tokens and Meta invalidates them with
- * `code 190 / subcode 467 "user logged out"` — which was the root cause
- * of template sync failures while messaging kept working (messaging
- * already falls through to the env System User token).
+ * This intentionally mirrors the working free-form send path in
+ * `messaging.functions.ts`: use the token saved on the connected WhatsApp row
+ * first, then channel credentials, then the server env fallback. The
+ * `whatsapp_business_accounts.access_token` value is only a final legacy
+ * fallback because Embedded Signup can store a user OAuth token that later
+ * fails with Meta OAuth 190 / subcode 467 ("user logged out").
  */
-function resolveWabaToken(accountToken: string | null | undefined) {
+async function resolveWabaTokenForAccount(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  account: AccountRow,
+) {
+  const { data: conn } = await supabase
+    .from("whatsapp_connections")
+    .select("meta,connected_at")
+    .eq("business_id", account.business_id)
+    .eq("status", "connected")
+    .eq("waba_id", account.waba_id)
+    .eq("phone_number_id", account.phone_number_id)
+    .order("connected_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const connToken = ((conn?.meta ?? {}) as Record<string, string>).access_token?.trim();
+  if (connToken) return { token: connToken, source: "whatsapp_connections.meta.access_token" as const };
+
+  const { data: credsRow } = await supabase
+    .from("channel_credentials")
+    .select("credentials,is_active")
+    .eq("business_id", account.business_id)
+    .eq("provider", "whatsapp")
+    .maybeSingle();
+  const creds = ((credsRow?.credentials ?? {}) as Record<string, string>) || {};
+  const credsToken = credsRow?.is_active ? creds.access_token?.trim() : null;
+  const credsPhoneNumberId = creds.phone_number_id?.trim();
+  if (credsToken && (!credsPhoneNumberId || credsPhoneNumberId === account.phone_number_id)) {
+    return { token: credsToken, source: "channel_credentials.access_token" as const };
+  }
+
   const envToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim() || null;
   if (envToken) return { token: envToken, source: "env:WHATSAPP_ACCESS_TOKEN" as const };
-  if (accountToken) return { token: accountToken, source: "whatsapp_business_accounts.access_token" as const };
+
+  const accountToken = account.access_token?.trim() || null;
+  if (accountToken) return { token: accountToken, source: "whatsapp_business_accounts.access_token:legacy-fallback" as const };
+
   return { token: null, source: "none" as const };
 }
 
@@ -121,7 +154,7 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const account = await loadAccountForUser(supabase, userId, data.accountId);
 
-    const { token, source: tokenSource } = resolveWabaToken(account.access_token);
+    const { token, source: tokenSource } = await resolveWabaTokenForAccount(supabase, account);
     if (!token) {
       await supabase.from("whatsapp_template_sync_logs").insert({
         business_id: account.business_id, status: "error", error: "Missing access token",
@@ -228,7 +261,7 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       throw new Error("Template belongs to a different workspace than the contact");
     }
 
-    const { token, source: tokenSource } = resolveWabaToken(account.access_token);
+    const { token, source: tokenSource } = await resolveWabaTokenForAccount(supabase, account);
     if (!token || !account.phone_number_id) {
       throw new Error("WhatsApp account is not fully configured");
     }
