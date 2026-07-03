@@ -183,7 +183,30 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
         const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         const txt = await res.text();
         console.log("[wa-template-sync:response]", { status: res.status, ok: res.ok, bodyPreview: txt.slice(0, 160) });
-        if (!res.ok) throw new Error(`Meta API ${res.status}: ${txt.slice(0, 200)}`);
+        if (!res.ok) {
+          let parsed: { error?: { code?: number; error_subcode?: number; message?: string } } = {};
+          try { parsed = JSON.parse(txt); } catch { /* keep raw */ }
+          const code = parsed?.error?.code;
+          const subcode = parsed?.error?.error_subcode;
+          const metaMsg = parsed?.error?.message ?? txt.slice(0, 200);
+          if (res.status === 403 && code === 200) {
+            throw new Error(
+              `Meta denied template access for WABA ${account.waba_id} (token source: ${tokenSource}). ` +
+              `The access token lacks admin permission on this WhatsApp Business Account. Fix in Meta Business Suite: ` +
+              `1) In Business Settings → Users → System Users, open the System User whose token is used here and click "Add Assets" → WhatsApp Accounts → select this WABA → grant "Full control". ` +
+              `2) Ensure the System User has the "whatsapp_business_management" and "whatsapp_business_messaging" permissions on the generated token. ` +
+              `3) If your Business enforces 2FA, enable 2FA on the admin account that owns the System User. ` +
+              `Then re-generate the System User token and update WHATSAPP_ACCESS_TOKEN. Raw: ${metaMsg}`
+            );
+          }
+          if (res.status === 401 || subcode === 467) {
+            throw new Error(
+              `Meta token invalid/expired for WABA ${account.waba_id} (token source: ${tokenSource}). ` +
+              `Generate a new permanent System User token and update WHATSAPP_ACCESS_TOKEN. Raw: ${metaMsg}`
+            );
+          }
+          throw new Error(`Meta API ${res.status}: ${metaMsg}`);
+        }
         const json: { data?: MetaTemplate[]; paging?: { next?: string } } = JSON.parse(txt);
         all.push(...(json.data ?? []));
         url = json.paging?.next ?? null;
