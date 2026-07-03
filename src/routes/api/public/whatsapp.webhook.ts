@@ -359,8 +359,8 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               const value = change?.value ?? {};
               const phoneNumberId: string | undefined = value?.metadata?.phone_number_id;
               const displayPhoneNumber: string | undefined = value?.metadata?.display_phone_number;
-              const businessLookup = await findBusinessForPhoneNumberId(phoneNumberId, displayPhoneNumber);
-              const businessId = businessLookup.businessId;
+              const businessLookup = await findBusinessesForPhoneNumberId(phoneNumberId, displayPhoneNumber);
+              const businessIds = businessLookup.matches.map((m) => m.businessId);
 
               const contactsMeta: Array<{ wa_id: string; profile?: { name?: string } }> =
                 value?.contacts ?? [];
@@ -385,130 +385,129 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   (mediaKind ? "" : `[${m?.type ?? "message"}]`);
                 const providerId: string | null = m?.id ?? null;
 
-                const trace: Record<string, unknown> = {
-                  event: "inbound_message",
-                  phone_number_id: phoneNumberId ?? null,
-                  display_phone_number: displayPhoneNumber ?? null,
-                  sender_number: phone,
-                  message_text: text,
-                  provider_message_id: providerId,
-                  business_lookup: businessLookup,
-                  contact_result: null,
-                  conversation_lookup_result: null,
-                  database_insert_result: null,
-                  error: null,
-                };
-
-                if (!businessId) {
-                  const error = `No business matched phone_number_id ${phoneNumberId ?? "<missing>"}`;
-                  trace.error = error;
+                if (businessIds.length === 0) {
+                  const trace: Record<string, unknown> = {
+                    event: "inbound_message",
+                    phone_number_id: phoneNumberId ?? null,
+                    display_phone_number: displayPhoneNumber ?? null,
+                    sender_number: phone,
+                    message_text: text,
+                    provider_message_id: providerId,
+                    business_lookup: businessLookup,
+                    error: `No business matched phone_number_id ${phoneNumberId ?? "<missing>"}`,
+                  };
                   console.warn("WhatsApp inbound routing failed:", JSON.stringify(trace));
-                  await logWebhookEvent({ businessId: null, signatureOk: true, payload: trace, error });
+                  await logWebhookEvent({
+                    businessId: null,
+                    signatureOk: true,
+                    payload: trace,
+                    error: String(trace.error),
+                  });
                   continue;
                 }
 
-                try {
-                  const contact = await upsertContact(
-                    businessId,
-                    phone,
-                    nameByWaId.get(from) ?? null,
-                  );
-                  trace.contact_result = contact;
-
-                  const { conversation, created: conversationCreated } = await getOrCreateConversation(businessId, contact.id);
-                  trace.conversation_lookup_result = {
-                    found: Boolean(conversation),
-                    conversation_id: conversation?.id ?? null,
-                    business_id: conversation?.business_id ?? null,
-                    unread_count: conversation?.unread_count ?? null,
-                    created: conversationCreated,
+                // Fan out to every business that owns this phone_number_id.
+                for (const businessId of businessIds) {
+                  const trace: Record<string, unknown> = {
+                    event: "inbound_message",
+                    phone_number_id: phoneNumberId ?? null,
+                    display_phone_number: displayPhoneNumber ?? null,
+                    sender_number: phone,
+                    message_text: text,
+                    provider_message_id: providerId,
+                    business_lookup: businessLookup,
+                    fanout_business_id: businessId,
+                    fanout_total: businessIds.length,
+                    contact_result: null,
+                    conversation_lookup_result: null,
+                    database_insert_result: null,
                     error: null,
                   };
 
-                  if (providerId) {
-                    const { data: duplicate, error: duplicateError } = await supabaseAdmin
+                  try {
+                    const contact = await upsertContact(
+                      businessId,
+                      phone,
+                      nameByWaId.get(from) ?? null,
+                    );
+                    trace.contact_result = contact;
+
+                    const { conversation, created: conversationCreated } = await getOrCreateConversation(businessId, contact.id);
+                    trace.conversation_lookup_result = {
+                      conversation_id: conversation?.id ?? null,
+                      business_id: conversation?.business_id ?? null,
+                      created: conversationCreated,
+                    };
+
+                    if (providerId) {
+                      // Dedup scoped per-contact (unique index (contact_id, provider_message_id)).
+                      const { data: duplicate } = await supabaseAdmin
+                        .from("messages")
+                        .select("id,conversation_id")
+                        .eq("contact_id", contact.id)
+                        .eq("provider_message_id", providerId)
+                        .maybeSingle();
+                      if (duplicate) {
+                        trace.database_insert_result = {
+                          ok: true, skipped_duplicate: true,
+                          existing_message_id: duplicate.id,
+                          conversation_id: duplicate.conversation_id,
+                        };
+                        await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
+                        continue;
+                      }
+                    }
+
+                    let mediaFields: Record<string, unknown> = {};
+                    if (mediaKind && mediaNode?.id) {
+                      try {
+                        const stored = await downloadWhatsappMedia({
+                          businessId,
+                          mediaId: mediaNode.id,
+                          contactId: contact.id,
+                          kind: mediaKind === "sticker" ? "image" : mediaKind,
+                          filename: mediaNode.filename ?? null,
+                          mime: mediaNode.mime_type ?? null,
+                        });
+                        if (stored) mediaFields = stored;
+                      } catch (mediaErr) {
+                        trace.media_error = errorMessage(mediaErr);
+                      }
+                    }
+
+                    const { data: inserted, error: insertError } = await supabaseAdmin
                       .from("messages")
+                      .insert({
+                        contact_id: contact.id,
+                        conversation_id: conversation.id,
+                        direction: "inbound",
+                        content: text,
+                        channel: "whatsapp",
+                        provider_message_id: providerId,
+                        created_at: m?.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString(),
+                        ...mediaFields,
+                      })
                       .select("id,conversation_id,created_at")
-                      .eq("provider_message_id", providerId)
-                      .maybeSingle();
-                    if (duplicateError) throw duplicateError;
-                    if (duplicate) {
-                      trace.database_insert_result = {
-                        ok: true,
-                        skipped_duplicate: true,
-                        existing_message_id: duplicate.id,
-                        conversation_id: duplicate.conversation_id,
-                      };
-                      console.info("WhatsApp inbound duplicate skipped:", JSON.stringify(trace));
-                      await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
-                      continue;
-                    }
+                      .single();
+
+                    trace.database_insert_result = {
+                      ok: !insertError,
+                      message_id: inserted?.id ?? null,
+                      conversation_id: inserted?.conversation_id ?? null,
+                      error: insertError?.message ?? null,
+                    };
+                    if (insertError) throw insertError;
+
+                    await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
+                  } catch (messageError) {
+                    const message = errorMessage(messageError);
+                    trace.error = message;
+                    console.error("WhatsApp inbound message failed:", JSON.stringify(trace), messageError);
+                    await logWebhookEvent({ businessId, signatureOk: true, payload: trace, error: message });
                   }
-
-                  // Media download: pull from Meta and persist to chat-media.
-                  let mediaFields: Record<string, unknown> = {};
-                  if (mediaKind && mediaNode?.id) {
-                    try {
-                      const stored = await downloadWhatsappMedia({
-                        businessId,
-                        mediaId: mediaNode.id,
-                        contactId: contact.id,
-                        kind: mediaKind === "sticker" ? "image" : mediaKind,
-                        filename: mediaNode.filename ?? null,
-                        mime: mediaNode.mime_type ?? null,
-                      });
-                      if (stored) mediaFields = stored;
-                    } catch (mediaErr) {
-                      trace.media_error = errorMessage(mediaErr);
-                    }
-                  }
-
-                  const { data: inserted, error: insertError } = await supabaseAdmin
-                    .from("messages")
-                    .insert({
-                      contact_id: contact.id,
-                      conversation_id: conversation.id,
-                      direction: "inbound",
-                      content: text,
-                      channel: "whatsapp",
-                      provider_message_id: providerId,
-                      created_at: m?.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString(),
-                      ...mediaFields,
-                    })
-                    .select("id,conversation_id,created_at")
-                    .single();
-
-                  trace.database_insert_result = {
-                    ok: !insertError,
-                    message_id: inserted?.id ?? null,
-                    conversation_id: inserted?.conversation_id ?? null,
-                    created_at: inserted?.created_at ?? null,
-                    error: insertError?.message ?? null,
-                  };
-                  if (insertError) throw insertError;
-
-                  if (inserted.conversation_id) {
-                    const { data: conversationAfter } = await supabaseAdmin
-                      .from("conversations")
-                      .select("id,last_message_at,last_message_preview,last_direction,unread_count")
-                      .eq("id", inserted.conversation_id)
-                      .maybeSingle();
-                    trace.conversation_after_insert = conversationAfter ?? null;
-                  } else {
-                    trace.conversation_after_insert = null;
-                    trace.error = "Message inserted without conversation_id";
-                    console.warn("WhatsApp inbound inserted without conversation_id:", JSON.stringify(trace));
-                  }
-
-                  console.info("WhatsApp inbound stored:", JSON.stringify(trace));
-                  await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
-                } catch (messageError) {
-                  const message = errorMessage(messageError);
-                  trace.error = message;
-                  console.error("WhatsApp inbound message failed:", JSON.stringify(trace), messageError);
-                  await logWebhookEvent({ businessId, signatureOk: true, payload: trace, error: message });
                 }
               }
+
             }
           }
         } catch (err) {
