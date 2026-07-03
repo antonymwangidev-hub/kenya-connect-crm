@@ -185,6 +185,12 @@ function SettingsPage() {
           onChange={(e) => setPublic("whatsapp", "phone_number_id", e.target.value)}
         />
         <Input
+          placeholder="WhatsApp Business Account ID (WABA ID)"
+          value={forms.whatsapp.public_fields.waba_id ?? ""}
+          onChange={(e) => setPublic("whatsapp", "waba_id", e.target.value)}
+        />
+
+        <Input
           type="password"
           autoComplete="off"
           placeholder={secretPlaceholder("whatsapp", "verify_token") || "Webhook verify token (optional)"}
