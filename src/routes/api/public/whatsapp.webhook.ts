@@ -155,133 +155,82 @@ async function downloadWhatsappMedia(opts: {
   };
 }
 
-async function findBusinessForPhoneNumberId(
+async function findBusinessesForPhoneNumberId(
   phoneNumberId: string | undefined,
   displayPhoneNumber?: string,
 ): Promise<BusinessLookup> {
-  // Multi-tenant routing: Meta sends value.metadata.phone_number_id for the
-  // receiving WhatsApp number. Prefer whatsapp_connections (embedded signup),
-  // then display-phone matching for older rows missing phone_number_id,
-  // then channel_credentials (manual setup), then an explicit env fallback.
+  // Multi-tenant fan-out: the SAME WhatsApp number can be connected to
+  // multiple businesses (e.g. a user configured it manually in Settings AND
+  // used Embedded Signup, or shared the number across workspaces). We collect
+  // every business_id that resolves for this phone_number_id and route the
+  // inbound event to each one so the message appears in every inbox.
   const normalized = phoneNumberId?.trim() || null;
   const attempts: BusinessLookup["attempts"] = [];
   const displayDigits = phoneDigits(displayPhoneNumber);
-
-  if (!normalized && !displayDigits) {
-    return { businessId: null, phoneNumberId: null, source: "missing_phone_number_id", attempts };
-  }
+  const seen = new Set<string>();
+  const matches: BusinessMatch[] = [];
+  const push = (businessId: string, source: BusinessMatch["source"]) => {
+    if (!businessId || seen.has(businessId)) return;
+    seen.add(businessId);
+    matches.push({ businessId, source });
+  };
 
   if (normalized) {
-    const { data: connection, error: connectionError } = await supabaseAdmin
+    const { data: conns } = await supabaseAdmin
       .from("whatsapp_connections")
-      .select("id,business_id,status,connected_at")
+      .select("id,business_id,status")
       .eq("phone_number_id", normalized)
-      .order("connected_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    attempts.push({
-      source: "whatsapp_connections",
-      ok: !connectionError,
-      business_id: connection?.business_id ?? null,
-      status: connection?.status ?? null,
-      error: connectionError?.message ?? null,
-    });
-    if (connection?.business_id) {
-      return { businessId: connection.business_id, phoneNumberId: normalized, source: "whatsapp_connections", attempts };
-    }
-  } else {
-    attempts.push({ source: "whatsapp_connections", ok: false, skipped: "missing_phone_number_id" });
+      .neq("status", "disconnected");
+    attempts.push({ source: "whatsapp_connections", count: conns?.length ?? 0 });
+    for (const c of conns ?? []) push(c.business_id, "whatsapp_connections");
+
+    const { data: accounts } = await supabaseAdmin
+      .from("whatsapp_business_accounts")
+      .select("business_id,status")
+      .eq("phone_number_id", normalized);
+    attempts.push({ source: "whatsapp_business_accounts", count: accounts?.length ?? 0 });
+    for (const a of accounts ?? []) push(a.business_id, "whatsapp_business_accounts");
   }
 
   if (displayDigits) {
-    const { data: displayRows, error: displayError } = await supabaseAdmin
+    const { data: displayRows } = await supabaseAdmin
       .from("whatsapp_connections")
-      .select("id,business_id,status,phone_number,phone_number_id,connected_at")
-      .order("connected_at", { ascending: false, nullsFirst: false })
-      .limit(50);
-    const displayMatch = (displayRows ?? []).find(
-      (row) => phoneDigits(row.phone_number) === displayDigits && row.status !== "disconnected",
-    );
-    attempts.push({
-      source: "whatsapp_connections_display_phone",
-      ok: !displayError,
-      display_phone_number: displayPhoneNumber ?? null,
-      rows_checked: displayRows?.length ?? 0,
-      business_id: displayMatch?.business_id ?? null,
-      status: displayMatch?.status ?? null,
-      matched_connection_id: displayMatch?.id ?? null,
-      had_phone_number_id: Boolean(displayMatch?.phone_number_id),
-      error: displayError?.message ?? null,
-    });
-    if (displayMatch?.business_id) {
-      await maybeBackfillConnectionPhoneId(displayMatch.id, normalized ?? undefined);
-      return {
-        businessId: displayMatch.business_id,
-        phoneNumberId: normalized,
-        source: "whatsapp_connections_display_phone",
-        attempts,
-      };
+      .select("id,business_id,status,phone_number,phone_number_id")
+      .neq("status", "disconnected")
+      .limit(500);
+    for (const row of displayRows ?? []) {
+      if (phoneDigits(row.phone_number) === displayDigits) {
+        push(row.business_id, "whatsapp_connections_display_phone");
+        await maybeBackfillConnectionPhoneId(row.id, normalized ?? undefined);
+      }
     }
   }
 
-  const { data: credentialRows, error: credentialError } = await supabaseAdmin
+  const { data: credentialRows } = await supabaseAdmin
     .from("channel_credentials")
     .select("business_id,credentials,is_active")
     .eq("provider", "whatsapp")
     .eq("is_active", true);
-  const credentialMatch = normalized ? (credentialRows ?? []).find((row) => {
+  for (const row of credentialRows ?? []) {
     const credentials = (row.credentials ?? {}) as Record<string, string>;
-    return String(credentials.phone_number_id ?? "").trim() === normalized;
-  }) : undefined;
-  attempts.push({
-    source: "channel_credentials",
-    ok: !credentialError,
-    active_rows_checked: credentialRows?.length ?? 0,
-    business_id: credentialMatch?.business_id ?? null,
-    error: credentialError?.message ?? null,
-  });
-  if (credentialMatch?.business_id) {
-    return { businessId: credentialMatch.business_id, phoneNumberId: normalized, source: "channel_credentials", attempts };
-  }
-
-  if (displayDigits) {
-    const credentialDisplayMatch = (credentialRows ?? []).find((row) => {
-      const credentials = (row.credentials ?? {}) as Record<string, string>;
-      return [credentials.phone_number, credentials.display_phone_number].some(
-        (candidate) => phoneDigits(candidate) === displayDigits,
-      );
-    });
-    attempts.push({
-      source: "channel_credentials_display_phone",
-      ok: !credentialError,
-      display_phone_number: displayPhoneNumber ?? null,
-      business_id: credentialDisplayMatch?.business_id ?? null,
-    });
-    if (credentialDisplayMatch?.business_id) {
-      return {
-        businessId: credentialDisplayMatch.business_id,
-        phoneNumberId: normalized,
-        source: "channel_credentials_display_phone",
-        attempts,
-      };
+    const credPnId = String(credentials.phone_number_id ?? "").trim();
+    const credDisplay = phoneDigits(credentials.phone_number ?? credentials.display_phone_number);
+    if ((normalized && credPnId === normalized) || (displayDigits && credDisplay === displayDigits)) {
+      push(row.business_id, "channel_credentials");
     }
   }
 
   const envPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
   const envBusinessId = process.env.WHATSAPP_DEFAULT_BUSINESS_ID?.trim();
-  const envMatches = Boolean(envPhoneNumberId && envBusinessId && envPhoneNumberId === normalized);
-  attempts.push({
-    source: "env",
-    ok: envMatches,
-    phone_number_id_matches: envPhoneNumberId ? envPhoneNumberId === normalized : false,
-    has_default_business_id: Boolean(envBusinessId),
-  });
-  if (envMatches) {
-    return { businessId: envBusinessId!, phoneNumberId: normalized, source: "env", attempts };
+  if (envPhoneNumberId && envBusinessId && normalized && envPhoneNumberId === normalized) {
+    push(envBusinessId, "env");
   }
 
-  return { businessId: null, phoneNumberId: normalized, source: "not_found", attempts };
+  attempts.push({ source: "final", matched_count: matches.length });
+  return { matches, phoneNumberId: normalized, attempts };
 }
+
+
 
 
 async function upsertContact(businessId: string, phone: string, name: string | null): Promise<ContactLookup> {
