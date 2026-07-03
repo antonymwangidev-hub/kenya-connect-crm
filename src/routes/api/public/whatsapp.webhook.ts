@@ -23,19 +23,22 @@ function verifySignature(rawBody: string, signatureHeader: string | null): boole
   }
 }
 
-type BusinessLookup = {
-  businessId: string | null;
-  phoneNumberId: string | null;
+type BusinessMatch = {
+  businessId: string;
   source:
     | "whatsapp_connections"
     | "whatsapp_connections_display_phone"
     | "channel_credentials"
-    | "channel_credentials_display_phone"
-    | "env"
-    | "not_found"
-    | "missing_phone_number_id";
+    | "whatsapp_business_accounts"
+    | "env";
+};
+
+type BusinessLookup = {
+  matches: BusinessMatch[];
+  phoneNumberId: string | null;
   attempts: Array<Record<string, unknown>>;
 };
+
 
 type ContactLookup = {
   id: string;
