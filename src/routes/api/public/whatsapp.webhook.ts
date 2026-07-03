@@ -23,19 +23,22 @@ function verifySignature(rawBody: string, signatureHeader: string | null): boole
   }
 }
 
-type BusinessLookup = {
-  businessId: string | null;
-  phoneNumberId: string | null;
+type BusinessMatch = {
+  businessId: string;
   source:
     | "whatsapp_connections"
     | "whatsapp_connections_display_phone"
     | "channel_credentials"
-    | "channel_credentials_display_phone"
-    | "env"
-    | "not_found"
-    | "missing_phone_number_id";
+    | "whatsapp_business_accounts"
+    | "env";
+};
+
+type BusinessLookup = {
+  matches: BusinessMatch[];
+  phoneNumberId: string | null;
   attempts: Array<Record<string, unknown>>;
 };
+
 
 type ContactLookup = {
   id: string;
@@ -152,133 +155,82 @@ async function downloadWhatsappMedia(opts: {
   };
 }
 
-async function findBusinessForPhoneNumberId(
+async function findBusinessesForPhoneNumberId(
   phoneNumberId: string | undefined,
   displayPhoneNumber?: string,
 ): Promise<BusinessLookup> {
-  // Multi-tenant routing: Meta sends value.metadata.phone_number_id for the
-  // receiving WhatsApp number. Prefer whatsapp_connections (embedded signup),
-  // then display-phone matching for older rows missing phone_number_id,
-  // then channel_credentials (manual setup), then an explicit env fallback.
+  // Multi-tenant fan-out: the SAME WhatsApp number can be connected to
+  // multiple businesses (e.g. a user configured it manually in Settings AND
+  // used Embedded Signup, or shared the number across workspaces). We collect
+  // every business_id that resolves for this phone_number_id and route the
+  // inbound event to each one so the message appears in every inbox.
   const normalized = phoneNumberId?.trim() || null;
   const attempts: BusinessLookup["attempts"] = [];
   const displayDigits = phoneDigits(displayPhoneNumber);
-
-  if (!normalized && !displayDigits) {
-    return { businessId: null, phoneNumberId: null, source: "missing_phone_number_id", attempts };
-  }
+  const seen = new Set<string>();
+  const matches: BusinessMatch[] = [];
+  const push = (businessId: string, source: BusinessMatch["source"]) => {
+    if (!businessId || seen.has(businessId)) return;
+    seen.add(businessId);
+    matches.push({ businessId, source });
+  };
 
   if (normalized) {
-    const { data: connection, error: connectionError } = await supabaseAdmin
+    const { data: conns } = await supabaseAdmin
       .from("whatsapp_connections")
-      .select("id,business_id,status,connected_at")
+      .select("id,business_id,status")
       .eq("phone_number_id", normalized)
-      .order("connected_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    attempts.push({
-      source: "whatsapp_connections",
-      ok: !connectionError,
-      business_id: connection?.business_id ?? null,
-      status: connection?.status ?? null,
-      error: connectionError?.message ?? null,
-    });
-    if (connection?.business_id) {
-      return { businessId: connection.business_id, phoneNumberId: normalized, source: "whatsapp_connections", attempts };
-    }
-  } else {
-    attempts.push({ source: "whatsapp_connections", ok: false, skipped: "missing_phone_number_id" });
+      .neq("status", "disconnected");
+    attempts.push({ source: "whatsapp_connections", count: conns?.length ?? 0 });
+    for (const c of conns ?? []) push(c.business_id, "whatsapp_connections");
+
+    const { data: accounts } = await supabaseAdmin
+      .from("whatsapp_business_accounts")
+      .select("business_id,status")
+      .eq("phone_number_id", normalized);
+    attempts.push({ source: "whatsapp_business_accounts", count: accounts?.length ?? 0 });
+    for (const a of accounts ?? []) push(a.business_id, "whatsapp_business_accounts");
   }
 
   if (displayDigits) {
-    const { data: displayRows, error: displayError } = await supabaseAdmin
+    const { data: displayRows } = await supabaseAdmin
       .from("whatsapp_connections")
-      .select("id,business_id,status,phone_number,phone_number_id,connected_at")
-      .order("connected_at", { ascending: false, nullsFirst: false })
-      .limit(50);
-    const displayMatch = (displayRows ?? []).find(
-      (row) => phoneDigits(row.phone_number) === displayDigits && row.status !== "disconnected",
-    );
-    attempts.push({
-      source: "whatsapp_connections_display_phone",
-      ok: !displayError,
-      display_phone_number: displayPhoneNumber ?? null,
-      rows_checked: displayRows?.length ?? 0,
-      business_id: displayMatch?.business_id ?? null,
-      status: displayMatch?.status ?? null,
-      matched_connection_id: displayMatch?.id ?? null,
-      had_phone_number_id: Boolean(displayMatch?.phone_number_id),
-      error: displayError?.message ?? null,
-    });
-    if (displayMatch?.business_id) {
-      await maybeBackfillConnectionPhoneId(displayMatch.id, normalized ?? undefined);
-      return {
-        businessId: displayMatch.business_id,
-        phoneNumberId: normalized,
-        source: "whatsapp_connections_display_phone",
-        attempts,
-      };
+      .select("id,business_id,status,phone_number,phone_number_id")
+      .neq("status", "disconnected")
+      .limit(500);
+    for (const row of displayRows ?? []) {
+      if (phoneDigits(row.phone_number) === displayDigits) {
+        push(row.business_id, "whatsapp_connections_display_phone");
+        await maybeBackfillConnectionPhoneId(row.id, normalized ?? undefined);
+      }
     }
   }
 
-  const { data: credentialRows, error: credentialError } = await supabaseAdmin
+  const { data: credentialRows } = await supabaseAdmin
     .from("channel_credentials")
     .select("business_id,credentials,is_active")
     .eq("provider", "whatsapp")
     .eq("is_active", true);
-  const credentialMatch = normalized ? (credentialRows ?? []).find((row) => {
+  for (const row of credentialRows ?? []) {
     const credentials = (row.credentials ?? {}) as Record<string, string>;
-    return String(credentials.phone_number_id ?? "").trim() === normalized;
-  }) : undefined;
-  attempts.push({
-    source: "channel_credentials",
-    ok: !credentialError,
-    active_rows_checked: credentialRows?.length ?? 0,
-    business_id: credentialMatch?.business_id ?? null,
-    error: credentialError?.message ?? null,
-  });
-  if (credentialMatch?.business_id) {
-    return { businessId: credentialMatch.business_id, phoneNumberId: normalized, source: "channel_credentials", attempts };
-  }
-
-  if (displayDigits) {
-    const credentialDisplayMatch = (credentialRows ?? []).find((row) => {
-      const credentials = (row.credentials ?? {}) as Record<string, string>;
-      return [credentials.phone_number, credentials.display_phone_number].some(
-        (candidate) => phoneDigits(candidate) === displayDigits,
-      );
-    });
-    attempts.push({
-      source: "channel_credentials_display_phone",
-      ok: !credentialError,
-      display_phone_number: displayPhoneNumber ?? null,
-      business_id: credentialDisplayMatch?.business_id ?? null,
-    });
-    if (credentialDisplayMatch?.business_id) {
-      return {
-        businessId: credentialDisplayMatch.business_id,
-        phoneNumberId: normalized,
-        source: "channel_credentials_display_phone",
-        attempts,
-      };
+    const credPnId = String(credentials.phone_number_id ?? "").trim();
+    const credDisplay = phoneDigits(credentials.phone_number ?? credentials.display_phone_number);
+    if ((normalized && credPnId === normalized) || (displayDigits && credDisplay === displayDigits)) {
+      push(row.business_id, "channel_credentials");
     }
   }
 
   const envPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
   const envBusinessId = process.env.WHATSAPP_DEFAULT_BUSINESS_ID?.trim();
-  const envMatches = Boolean(envPhoneNumberId && envBusinessId && envPhoneNumberId === normalized);
-  attempts.push({
-    source: "env",
-    ok: envMatches,
-    phone_number_id_matches: envPhoneNumberId ? envPhoneNumberId === normalized : false,
-    has_default_business_id: Boolean(envBusinessId),
-  });
-  if (envMatches) {
-    return { businessId: envBusinessId!, phoneNumberId: normalized, source: "env", attempts };
+  if (envPhoneNumberId && envBusinessId && normalized && envPhoneNumberId === normalized) {
+    push(envBusinessId, "env");
   }
 
-  return { businessId: null, phoneNumberId: normalized, source: "not_found", attempts };
+  attempts.push({ source: "final", matched_count: matches.length });
+  return { matches, phoneNumberId: normalized, attempts };
 }
+
+
 
 
 async function upsertContact(businessId: string, phone: string, name: string | null): Promise<ContactLookup> {
@@ -407,8 +359,8 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               const value = change?.value ?? {};
               const phoneNumberId: string | undefined = value?.metadata?.phone_number_id;
               const displayPhoneNumber: string | undefined = value?.metadata?.display_phone_number;
-              const businessLookup = await findBusinessForPhoneNumberId(phoneNumberId, displayPhoneNumber);
-              const businessId = businessLookup.businessId;
+              const businessLookup = await findBusinessesForPhoneNumberId(phoneNumberId, displayPhoneNumber);
+              const businessIds = businessLookup.matches.map((m) => m.businessId);
 
               const contactsMeta: Array<{ wa_id: string; profile?: { name?: string } }> =
                 value?.contacts ?? [];
@@ -433,130 +385,129 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   (mediaKind ? "" : `[${m?.type ?? "message"}]`);
                 const providerId: string | null = m?.id ?? null;
 
-                const trace: Record<string, unknown> = {
-                  event: "inbound_message",
-                  phone_number_id: phoneNumberId ?? null,
-                  display_phone_number: displayPhoneNumber ?? null,
-                  sender_number: phone,
-                  message_text: text,
-                  provider_message_id: providerId,
-                  business_lookup: businessLookup,
-                  contact_result: null,
-                  conversation_lookup_result: null,
-                  database_insert_result: null,
-                  error: null,
-                };
-
-                if (!businessId) {
-                  const error = `No business matched phone_number_id ${phoneNumberId ?? "<missing>"}`;
-                  trace.error = error;
+                if (businessIds.length === 0) {
+                  const trace: Record<string, unknown> = {
+                    event: "inbound_message",
+                    phone_number_id: phoneNumberId ?? null,
+                    display_phone_number: displayPhoneNumber ?? null,
+                    sender_number: phone,
+                    message_text: text,
+                    provider_message_id: providerId,
+                    business_lookup: businessLookup,
+                    error: `No business matched phone_number_id ${phoneNumberId ?? "<missing>"}`,
+                  };
                   console.warn("WhatsApp inbound routing failed:", JSON.stringify(trace));
-                  await logWebhookEvent({ businessId: null, signatureOk: true, payload: trace, error });
+                  await logWebhookEvent({
+                    businessId: null,
+                    signatureOk: true,
+                    payload: trace,
+                    error: String(trace.error),
+                  });
                   continue;
                 }
 
-                try {
-                  const contact = await upsertContact(
-                    businessId,
-                    phone,
-                    nameByWaId.get(from) ?? null,
-                  );
-                  trace.contact_result = contact;
-
-                  const { conversation, created: conversationCreated } = await getOrCreateConversation(businessId, contact.id);
-                  trace.conversation_lookup_result = {
-                    found: Boolean(conversation),
-                    conversation_id: conversation?.id ?? null,
-                    business_id: conversation?.business_id ?? null,
-                    unread_count: conversation?.unread_count ?? null,
-                    created: conversationCreated,
+                // Fan out to every business that owns this phone_number_id.
+                for (const businessId of businessIds) {
+                  const trace: Record<string, unknown> = {
+                    event: "inbound_message",
+                    phone_number_id: phoneNumberId ?? null,
+                    display_phone_number: displayPhoneNumber ?? null,
+                    sender_number: phone,
+                    message_text: text,
+                    provider_message_id: providerId,
+                    business_lookup: businessLookup,
+                    fanout_business_id: businessId,
+                    fanout_total: businessIds.length,
+                    contact_result: null,
+                    conversation_lookup_result: null,
+                    database_insert_result: null,
                     error: null,
                   };
 
-                  if (providerId) {
-                    const { data: duplicate, error: duplicateError } = await supabaseAdmin
+                  try {
+                    const contact = await upsertContact(
+                      businessId,
+                      phone,
+                      nameByWaId.get(from) ?? null,
+                    );
+                    trace.contact_result = contact;
+
+                    const { conversation, created: conversationCreated } = await getOrCreateConversation(businessId, contact.id);
+                    trace.conversation_lookup_result = {
+                      conversation_id: conversation?.id ?? null,
+                      business_id: conversation?.business_id ?? null,
+                      created: conversationCreated,
+                    };
+
+                    if (providerId) {
+                      // Dedup scoped per-contact (unique index (contact_id, provider_message_id)).
+                      const { data: duplicate } = await supabaseAdmin
+                        .from("messages")
+                        .select("id,conversation_id")
+                        .eq("contact_id", contact.id)
+                        .eq("provider_message_id", providerId)
+                        .maybeSingle();
+                      if (duplicate) {
+                        trace.database_insert_result = {
+                          ok: true, skipped_duplicate: true,
+                          existing_message_id: duplicate.id,
+                          conversation_id: duplicate.conversation_id,
+                        };
+                        await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
+                        continue;
+                      }
+                    }
+
+                    let mediaFields: Record<string, unknown> = {};
+                    if (mediaKind && mediaNode?.id) {
+                      try {
+                        const stored = await downloadWhatsappMedia({
+                          businessId,
+                          mediaId: mediaNode.id,
+                          contactId: contact.id,
+                          kind: mediaKind === "sticker" ? "image" : mediaKind,
+                          filename: mediaNode.filename ?? null,
+                          mime: mediaNode.mime_type ?? null,
+                        });
+                        if (stored) mediaFields = stored;
+                      } catch (mediaErr) {
+                        trace.media_error = errorMessage(mediaErr);
+                      }
+                    }
+
+                    const { data: inserted, error: insertError } = await supabaseAdmin
                       .from("messages")
+                      .insert({
+                        contact_id: contact.id,
+                        conversation_id: conversation.id,
+                        direction: "inbound",
+                        content: text,
+                        channel: "whatsapp",
+                        provider_message_id: providerId,
+                        created_at: m?.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString(),
+                        ...mediaFields,
+                      })
                       .select("id,conversation_id,created_at")
-                      .eq("provider_message_id", providerId)
-                      .maybeSingle();
-                    if (duplicateError) throw duplicateError;
-                    if (duplicate) {
-                      trace.database_insert_result = {
-                        ok: true,
-                        skipped_duplicate: true,
-                        existing_message_id: duplicate.id,
-                        conversation_id: duplicate.conversation_id,
-                      };
-                      console.info("WhatsApp inbound duplicate skipped:", JSON.stringify(trace));
-                      await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
-                      continue;
-                    }
+                      .single();
+
+                    trace.database_insert_result = {
+                      ok: !insertError,
+                      message_id: inserted?.id ?? null,
+                      conversation_id: inserted?.conversation_id ?? null,
+                      error: insertError?.message ?? null,
+                    };
+                    if (insertError) throw insertError;
+
+                    await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
+                  } catch (messageError) {
+                    const message = errorMessage(messageError);
+                    trace.error = message;
+                    console.error("WhatsApp inbound message failed:", JSON.stringify(trace), messageError);
+                    await logWebhookEvent({ businessId, signatureOk: true, payload: trace, error: message });
                   }
-
-                  // Media download: pull from Meta and persist to chat-media.
-                  let mediaFields: Record<string, unknown> = {};
-                  if (mediaKind && mediaNode?.id) {
-                    try {
-                      const stored = await downloadWhatsappMedia({
-                        businessId,
-                        mediaId: mediaNode.id,
-                        contactId: contact.id,
-                        kind: mediaKind === "sticker" ? "image" : mediaKind,
-                        filename: mediaNode.filename ?? null,
-                        mime: mediaNode.mime_type ?? null,
-                      });
-                      if (stored) mediaFields = stored;
-                    } catch (mediaErr) {
-                      trace.media_error = errorMessage(mediaErr);
-                    }
-                  }
-
-                  const { data: inserted, error: insertError } = await supabaseAdmin
-                    .from("messages")
-                    .insert({
-                      contact_id: contact.id,
-                      conversation_id: conversation.id,
-                      direction: "inbound",
-                      content: text,
-                      channel: "whatsapp",
-                      provider_message_id: providerId,
-                      created_at: m?.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString(),
-                      ...mediaFields,
-                    })
-                    .select("id,conversation_id,created_at")
-                    .single();
-
-                  trace.database_insert_result = {
-                    ok: !insertError,
-                    message_id: inserted?.id ?? null,
-                    conversation_id: inserted?.conversation_id ?? null,
-                    created_at: inserted?.created_at ?? null,
-                    error: insertError?.message ?? null,
-                  };
-                  if (insertError) throw insertError;
-
-                  if (inserted.conversation_id) {
-                    const { data: conversationAfter } = await supabaseAdmin
-                      .from("conversations")
-                      .select("id,last_message_at,last_message_preview,last_direction,unread_count")
-                      .eq("id", inserted.conversation_id)
-                      .maybeSingle();
-                    trace.conversation_after_insert = conversationAfter ?? null;
-                  } else {
-                    trace.conversation_after_insert = null;
-                    trace.error = "Message inserted without conversation_id";
-                    console.warn("WhatsApp inbound inserted without conversation_id:", JSON.stringify(trace));
-                  }
-
-                  console.info("WhatsApp inbound stored:", JSON.stringify(trace));
-                  await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
-                } catch (messageError) {
-                  const message = errorMessage(messageError);
-                  trace.error = message;
-                  console.error("WhatsApp inbound message failed:", JSON.stringify(trace), messageError);
-                  await logWebhookEvent({ businessId, signatureOk: true, payload: trace, error: message });
                 }
               }
+
             }
           }
         } catch (err) {
