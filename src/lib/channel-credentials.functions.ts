@@ -134,5 +134,39 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
         { onConflict: "business_id,provider" },
       );
     if (error) throw new Error(error.message);
+
+    // For WhatsApp: keep whatsapp_business_accounts in sync so the manually
+    // configured account also appears in Templates and multi-account UIs.
+    if (data.provider === "whatsapp") {
+      const wabaId = (merged.waba_id ?? "").trim();
+      const phoneNumberId = (merged.phone_number_id ?? "").trim();
+      const accessToken = (merged.access_token ?? "").trim();
+      if (wabaId && phoneNumberId) {
+        const { data: bizRow } = await supabase
+          .from("businesses").select("name").eq("id", biz.id).maybeSingle();
+        await supabase.from("whatsapp_business_accounts").upsert(
+          {
+            business_id: biz.id,
+            waba_id: wabaId,
+            phone_number_id: phoneNumberId,
+            business_name: (bizRow?.name as string | undefined) ?? "WhatsApp Business",
+            access_token: accessToken || null,
+            status: data.is_active === false ? "disabled" : "connected",
+            meta: { source: "manual_settings" } as never,
+          },
+          { onConflict: "business_id,waba_id,phone_number_id" },
+        );
+      }
+    }
+    return { ok: true };
+  });
+
+          provider: data.provider,
+          credentials: merged,
+          is_active: data.is_active ?? existing?.is_active ?? false,
+        },
+        { onConflict: "business_id,provider" },
+      );
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
