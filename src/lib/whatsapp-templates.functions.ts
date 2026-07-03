@@ -228,10 +228,17 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       throw new Error("Template belongs to a different workspace than the contact");
     }
 
-    const token = account.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
+    const { token, source: tokenSource } = resolveWabaToken(account.access_token);
     if (!token || !account.phone_number_id) {
       throw new Error("WhatsApp account is not fully configured");
     }
+    console.log("[wa-template-send]", {
+      wabaId: account.waba_id,
+      phoneNumberId: account.phone_number_id,
+      tokenSource,
+      token: maskToken(token),
+      graphVersion: GRAPH_VERSION,
+    });
 
     // Build components payload
     const components: Array<Record<string, unknown>> = [];
