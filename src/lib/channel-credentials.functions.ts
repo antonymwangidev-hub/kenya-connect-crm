@@ -160,13 +160,3 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
-
-          provider: data.provider,
-          credentials: merged,
-          is_active: data.is_active ?? existing?.is_active ?? false,
-        },
-        { onConflict: "business_id,provider" },
-      );
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
