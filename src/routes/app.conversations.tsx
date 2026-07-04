@@ -28,6 +28,7 @@ import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { suggestReply } from "@/lib/ai.functions";
 import { createChatMediaUploadUrl, getChatMediaSignedUrl } from "@/lib/media.functions";
 import { SendTemplateModal } from "@/components/SendTemplateModal";
+import { MediaComposerPreview, uploadWithProgress } from "@/components/MediaComposer";
 
 type Tone = "polite" | "sales" | "urgent";
 
@@ -224,6 +225,7 @@ function ConversationsPage() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 30;
@@ -364,12 +366,18 @@ function ConversationsPage() {
   } | null> => {
     if (!pendingFile || !active) return null;
     setUploading(true);
+    setUploadProgress(0);
     try {
       const { path, token } = await uploadUrlFn({ data: { contactId: active.contact_id, filename: pendingFile.name } });
-      const { error } = await supabase.storage.from("chat-media").uploadToSignedUrl(path, token, pendingFile, {
-        contentType: pendingFile.type || "application/octet-stream",
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      await uploadWithProgress({
+        supabaseUrl,
+        bucket: "chat-media",
+        path,
+        token,
+        file: pendingFile,
+        onProgress: setUploadProgress,
       });
-      if (error) throw error;
       return {
         path, type: detectMediaType(pendingFile), mime: pendingFile.type || "application/octet-stream",
         filename: pendingFile.name, size: pendingFile.size,
@@ -404,6 +412,7 @@ function ConversationsPage() {
       const result = await sendFn({ data: { contactId: active.contact_id, content, ...(media ? { media } : {}) } });
       setDraft("");
       setPendingFile(null);
+      setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success(`Sent via ${result.channel}`);
     } catch (err) {
@@ -691,18 +700,17 @@ function ConversationsPage() {
                 </Button>
               </div>
               {pendingFile && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
-                  <FileIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{pendingFile.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                    className="rounded p-0.5 hover:bg-muted"
-                    aria-label="Remove attachment"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                <MediaComposerPreview
+                  file={pendingFile}
+                  progress={uploadProgress}
+                  uploading={uploading}
+                  sending={sending}
+                  onRemove={() => {
+                    setPendingFile(null);
+                    setUploadProgress(0);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                />
               )}
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <input
