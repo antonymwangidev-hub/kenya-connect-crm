@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WhatsappCallbackRouteImport } from './routes/whatsapp.callback'
+import { Route as AppWhatsappDiagnosticsRouteImport } from './routes/app.whatsapp-diagnostics'
 import { Route as AppWhatsappRouteImport } from './routes/app.whatsapp'
 import { Route as AppTemplatesRouteImport } from './routes/app.templates'
 import { Route as AppTagsRouteImport } from './routes/app.tags'
@@ -52,6 +53,11 @@ const WhatsappCallbackRoute = WhatsappCallbackRouteImport.update({
   id: '/whatsapp/callback',
   path: '/whatsapp/callback',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppWhatsappDiagnosticsRoute = AppWhatsappDiagnosticsRouteImport.update({
+  id: '/whatsapp-diagnostics',
+  path: '/whatsapp-diagnostics',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppWhatsappRoute = AppWhatsappRouteImport.update({
   id: '/whatsapp',
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
   '/app/whatsapp': typeof AppWhatsappRoute
+  '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
   '/app/whatsapp': typeof AppWhatsappRoute
+  '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
@@ -220,6 +228,7 @@ export interface FileRoutesById {
   '/app/tags': typeof AppTagsRoute
   '/app/templates': typeof AppTemplatesRoute
   '/app/whatsapp': typeof AppWhatsappRoute
+  '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
@@ -247,6 +256,7 @@ export interface FileRouteTypes {
     | '/app/tags'
     | '/app/templates'
     | '/app/whatsapp'
+    | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
@@ -272,6 +282,7 @@ export interface FileRouteTypes {
     | '/app/tags'
     | '/app/templates'
     | '/app/whatsapp'
+    | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
@@ -297,6 +308,7 @@ export interface FileRouteTypes {
     | '/app/tags'
     | '/app/templates'
     | '/app/whatsapp'
+    | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
     | '/api/public/at/webhook'
@@ -344,6 +356,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/whatsapp/callback'
       preLoaderRoute: typeof WhatsappCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/whatsapp-diagnostics': {
+      id: '/app/whatsapp-diagnostics'
+      path: '/whatsapp-diagnostics'
+      fullPath: '/app/whatsapp-diagnostics'
+      preLoaderRoute: typeof AppWhatsappDiagnosticsRouteImport
+      parentRoute: typeof AppRoute
     }
     '/app/whatsapp': {
       id: '/app/whatsapp'
@@ -497,6 +516,7 @@ interface AppRouteChildren {
   AppTagsRoute: typeof AppTagsRoute
   AppTemplatesRoute: typeof AppTemplatesRoute
   AppWhatsappRoute: typeof AppWhatsappRoute
+  AppWhatsappDiagnosticsRoute: typeof AppWhatsappDiagnosticsRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -515,6 +535,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTagsRoute: AppTagsRoute,
   AppTemplatesRoute: AppTemplatesRoute,
   AppWhatsappRoute: AppWhatsappRoute,
+  AppWhatsappDiagnosticsRoute: AppWhatsappDiagnosticsRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
