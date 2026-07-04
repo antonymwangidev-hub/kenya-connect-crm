@@ -700,18 +700,17 @@ function ConversationsPage() {
                 </Button>
               </div>
               {pendingFile && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs">
-                  <FileIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{pendingFile.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                    className="rounded p-0.5 hover:bg-muted"
-                    aria-label="Remove attachment"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                <MediaComposerPreview
+                  file={pendingFile}
+                  progress={uploadProgress}
+                  uploading={uploading}
+                  sending={sending}
+                  onRemove={() => {
+                    setPendingFile(null);
+                    setUploadProgress(0);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                />
               )}
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <input
