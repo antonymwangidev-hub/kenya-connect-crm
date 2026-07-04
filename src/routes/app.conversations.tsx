@@ -366,12 +366,18 @@ function ConversationsPage() {
   } | null> => {
     if (!pendingFile || !active) return null;
     setUploading(true);
+    setUploadProgress(0);
     try {
       const { path, token } = await uploadUrlFn({ data: { contactId: active.contact_id, filename: pendingFile.name } });
-      const { error } = await supabase.storage.from("chat-media").uploadToSignedUrl(path, token, pendingFile, {
-        contentType: pendingFile.type || "application/octet-stream",
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      await uploadWithProgress({
+        supabaseUrl,
+        bucket: "chat-media",
+        path,
+        token,
+        file: pendingFile,
+        onProgress: setUploadProgress,
       });
-      if (error) throw error;
       return {
         path, type: detectMediaType(pendingFile), mime: pendingFile.type || "application/octet-stream",
         filename: pendingFile.name, size: pendingFile.size,
