@@ -225,6 +225,7 @@ function ConversationsPage() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 30;
