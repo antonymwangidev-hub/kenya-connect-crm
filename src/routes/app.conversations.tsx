@@ -412,6 +412,7 @@ function ConversationsPage() {
       const result = await sendFn({ data: { contactId: active.contact_id, content, ...(media ? { media } : {}) } });
       setDraft("");
       setPendingFile(null);
+      setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success(`Sent via ${result.channel}`);
     } catch (err) {
