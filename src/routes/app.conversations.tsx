@@ -28,6 +28,7 @@ import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { suggestReply } from "@/lib/ai.functions";
 import { createChatMediaUploadUrl, getChatMediaSignedUrl } from "@/lib/media.functions";
 import { SendTemplateModal } from "@/components/SendTemplateModal";
+import { MediaComposerPreview, uploadWithProgress } from "@/components/MediaComposer";
 
 type Tone = "polite" | "sales" | "urgent";
 
