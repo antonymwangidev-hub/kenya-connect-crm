@@ -354,6 +354,10 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
 
         try {
           const entries = payload?.entry ?? [];
+          console.log("[WA webhook] POST received", {
+            entry_count: entries.length,
+            object: payload?.object ?? null,
+          });
           for (const entry of entries) {
             for (const change of entry?.changes ?? []) {
               const value = change?.value ?? {};
@@ -361,6 +365,14 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               const displayPhoneNumber: string | undefined = value?.metadata?.display_phone_number;
               const businessLookup = await findBusinessesForPhoneNumberId(phoneNumberId, displayPhoneNumber);
               const businessIds = businessLookup.matches.map((m) => m.businessId);
+              console.log("[WA webhook] change", {
+                field: change?.field ?? null,
+                phone_number_id: phoneNumberId ?? null,
+                display_phone_number: displayPhoneNumber ?? null,
+                matched_business_count: businessIds.length,
+                matched_business_ids: businessIds,
+                messages_in_change: (value?.messages ?? []).length,
+              });
 
               const contactsMeta: Array<{ wa_id: string; profile?: { name?: string } }> =
                 value?.contacts ?? [];
@@ -373,6 +385,13 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               for (const m of messages) {
                 const from: string = m?.from;
                 if (!from) continue;
+                console.log("[WA inbound]", {
+                  phone_number_id: phoneNumberId ?? null,
+                  from,
+                  type: m?.type ?? null,
+                  provider_message_id: m?.id ?? null,
+                  matched_business_ids: businessIds,
+                });
                 const phone = whatsappPhone(from);
                 const mediaKind = (
                   ["image", "video", "audio", "document", "sticker"] as const
