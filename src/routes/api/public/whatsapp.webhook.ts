@@ -519,6 +519,18 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                     if (insertError) throw insertError;
 
                     await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
+
+                    // Fire AI auto-reply (no-op if disabled for this business).
+                    try {
+                      await maybeAutoReply({
+                        businessId,
+                        contactId: contact.id,
+                        conversationId: conversation.id,
+                        toPhone: phone,
+                      });
+                    } catch (aiErr) {
+                      console.error("[WA webhook] AI reply failed", aiErr);
+                    }
                   } catch (messageError) {
                     const message = errorMessage(messageError);
                     trace.error = message;
