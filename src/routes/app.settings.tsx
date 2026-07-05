@@ -194,6 +194,129 @@ function SettingsPage() {
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
       <h1 className="flex items-center gap-2 text-xl font-bold"><SettingsIcon className="h-5 w-5" /> Settings</h1>
 
+      <section className="space-y-4 rounded-2xl border bg-card p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="flex items-center gap-2 font-semibold">
+              <Bot className="h-4 w-4" /> AI Assistant
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              When enabled, the AI automatically replies to incoming WhatsApp messages 24/7 using the business information below.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{ai?.enabled ? "On" : "Off"}</span>
+            <Switch
+              checked={Boolean(ai?.enabled)}
+              disabled={!ai || savingAi}
+              onCheckedChange={(v) => persistAi({ enabled: v })}
+            />
+          </div>
+        </div>
+
+        {ai && (
+          <div className="space-y-3 border-t pt-4">
+            <div className="text-xs font-medium text-muted-foreground">Business information the AI can read</div>
+
+            <div>
+              <Label>Business description / about</Label>
+              <Textarea
+                rows={3}
+                placeholder="What your business does, who you serve, what makes you different…"
+                value={ai.business_description ?? ""}
+                onChange={(e) => updateAi({ business_description: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label>Products &amp; services (with prices)</Label>
+              <Textarea
+                rows={5}
+                placeholder={"e.g.\n- Haircut — KES 500\n- Beard trim — KES 200\n- Home delivery available within Nairobi"}
+                value={ai.products_services ?? ""}
+                onChange={(e) => updateAi({ products_services: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Contact info</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="Phone, WhatsApp, email"
+                  value={ai.contact_info ?? ""}
+                  onChange={(e) => updateAi({ contact_info: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Address / location</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="Physical address, landmarks, city"
+                  value={ai.address ?? ""}
+                  onChange={(e) => updateAi({ address: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Website / social links</Label>
+                <Input
+                  placeholder="https://…"
+                  value={ai.website ?? ""}
+                  onChange={(e) => updateAi({ website: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Business hours</Label>
+                <Input
+                  placeholder="Mon–Sat 8am–6pm"
+                  value={ai.hours ?? ""}
+                  onChange={(e) => updateAi({ hours: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>FAQs</Label>
+              <Textarea
+                rows={5}
+                placeholder={"Q: Do you deliver?\nA: Yes, free delivery within town.\n\nQ: Payment methods?\nA: M-Pesa, cash on delivery."}
+                value={ai.faqs ?? ""}
+                onChange={(e) => updateAi({ faqs: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Reply tone</Label>
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                  value={ai.tone ?? "friendly"}
+                  onChange={(e) => updateAi({ tone: e.target.value })}
+                >
+                  <option value="friendly">Friendly</option>
+                  <option value="professional">Professional</option>
+                  <option value="casual">Casual</option>
+                  <option value="sales">Sales</option>
+                </select>
+              </div>
+              <div>
+                <Label>Custom instructions (optional)</Label>
+                <Input
+                  placeholder="e.g. Always ask for the customer's location before quoting delivery"
+                  value={ai.custom_instructions ?? ""}
+                  onChange={(e) => updateAi({ custom_instructions: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <Button onClick={() => persistAi()} disabled={savingAi}>
+              <CheckCircle2 className="mr-1 h-4 w-4" /> {savingAi ? "Saving…" : "Save AI settings"}
+            </Button>
+          </div>
+        )}
+      </section>
+
+
       <section className="space-y-3 rounded-2xl border bg-card p-5">
         <h2 className="font-semibold">Business profile</h2>
         <div className="grid gap-3 sm:grid-cols-2">
