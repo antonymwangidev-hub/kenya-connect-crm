@@ -8,11 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Settings as SettingsIcon, MessageCircle, Phone, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Settings as SettingsIcon, MessageCircle, Phone, CheckCircle2, ShieldCheck, Bot } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   listChannelCredentials,
   upsertChannelCredentials,
 } from "@/lib/channel-credentials.functions";
+import {
+  getAiAssistantSettings,
+  saveAiAssistantSettings,
+  type AiAssistantSettings,
+} from "@/lib/ai-assistant.functions";
 
 export const Route = createFileRoute("/app/settings")({
   component: SettingsPage,
