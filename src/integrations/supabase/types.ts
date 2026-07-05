@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_assistant_settings: {
+        Row: {
+          address: string | null
+          business_description: string | null
+          business_id: string
+          contact_info: string | null
+          custom_instructions: string | null
+          enabled: boolean
+          faqs: string | null
+          hours: string | null
+          products_services: string | null
+          tone: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          business_description?: string | null
+          business_id: string
+          contact_info?: string | null
+          custom_instructions?: string | null
+          enabled?: boolean
+          faqs?: string | null
+          hours?: string | null
+          products_services?: string | null
+          tone?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          business_description?: string | null
+          business_id?: string
+          contact_info?: string | null
+          custom_instructions?: string | null
+          enabled?: boolean
+          faqs?: string | null
+          hours?: string | null
+          products_services?: string | null
+          tone?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_assistant_settings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_rules: {
         Row: {
           action: Database["public"]["Enums"]["automation_action"]

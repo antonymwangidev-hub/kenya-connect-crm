@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
+import { maybeAutoReply } from "@/lib/ai-auto-reply.server";
 
 // Meta WhatsApp Cloud API webhook.
 // Public URL example: https://<project>.lovable.app/api/public/whatsapp/webhook
@@ -518,6 +519,18 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                     if (insertError) throw insertError;
 
                     await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
+
+                    // Fire AI auto-reply (no-op if disabled for this business).
+                    try {
+                      await maybeAutoReply({
+                        businessId,
+                        contactId: contact.id,
+                        conversationId: conversation.id,
+                        toPhone: phone,
+                      });
+                    } catch (aiErr) {
+                      console.error("[WA webhook] AI reply failed", aiErr);
+                    }
                   } catch (messageError) {
                     const message = errorMessage(messageError);
                     trace.error = message;
