@@ -58,14 +58,21 @@ function SettingsPage() {
     whatsapp: emptyForm(), africastalking: emptyForm(), mpesa: emptyForm(),
   });
   const [saving, setSaving] = useState(false);
+  const [ai, setAi] = useState<AiAssistantSettings | null>(null);
+  const [savingAi, setSavingAi] = useState(false);
 
   const listCreds = useServerFn(listChannelCredentials);
   const saveCreds = useServerFn(upsertChannelCredentials);
+  const loadAi = useServerFn(getAiAssistantSettings);
+  const saveAi = useServerFn(saveAiAssistantSettings);
 
   useEffect(() => {
     if (!businessId) return;
     supabase.from("businesses").select("*").eq("id", businessId).single()
       .then(({ data }) => setBiz((data as Biz) ?? null));
+    loadAi().then(({ settings }) => setAi(settings)).catch((e) =>
+      toast.error(e instanceof Error ? e.message : "Failed to load AI settings"),
+    );
     listCreds().then(({ creds }) => {
       const m: Record<Provider, CredMeta | undefined> = {
         whatsapp: undefined, africastalking: undefined, mpesa: undefined,
