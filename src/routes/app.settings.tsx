@@ -91,7 +91,38 @@ function SettingsPage() {
       setMeta(m);
       setForms(f);
     }).catch((e) => toast.error(e instanceof Error ? e.message : "Failed to load"));
-  }, [businessId, listCreds]);
+  }, [businessId, listCreds, loadAi]);
+
+  const updateAi = (patch: Partial<AiAssistantSettings>) =>
+    setAi((prev) => (prev ? { ...prev, ...patch } : prev));
+
+  const persistAi = async (next?: Partial<AiAssistantSettings>) => {
+    if (!ai) return;
+    const merged = { ...ai, ...(next ?? {}) };
+    setAi(merged);
+    setSavingAi(true);
+    try {
+      await saveAi({
+        data: {
+          enabled: merged.enabled,
+          business_description: merged.business_description ?? "",
+          products_services: merged.products_services ?? "",
+          contact_info: merged.contact_info ?? "",
+          address: merged.address ?? "",
+          website: merged.website ?? "",
+          hours: merged.hours ?? "",
+          faqs: merged.faqs ?? "",
+          tone: (merged.tone ?? "friendly") as "friendly" | "professional" | "casual" | "sales",
+          custom_instructions: merged.custom_instructions ?? "",
+        },
+      });
+      toast.success("AI assistant saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingAi(false);
+    }
+  };
 
   const updateBiz = (patch: Partial<Biz>) => setBiz((b) => ({ ...(b ?? {}), ...patch }));
   const setPublic = (p: Provider, k: string, v: string) =>
