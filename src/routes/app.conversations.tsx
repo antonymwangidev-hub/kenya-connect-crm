@@ -27,8 +27,15 @@ import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { suggestReply } from "@/lib/ai.functions";
 import { createChatMediaUploadUrl, getChatMediaSignedUrl } from "@/lib/media.functions";
+import { reactToMessage } from "@/lib/reactions.functions";
 import { SendTemplateModal } from "@/components/SendTemplateModal";
 import { MediaComposerPreview, uploadWithProgress } from "@/components/MediaComposer";
+import { ContactAvatar } from "@/components/ContactAvatar";
+import { EmojiPicker, QUICK_REACTIONS } from "@/components/EmojiPicker";
+import { MediaLightbox } from "@/components/MediaLightbox";
+import { EditContactDialog, type EditableContact } from "@/components/EditContactDialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SmilePlus } from "lucide-react";
 
 type Tone = "polite" | "sales" | "urgent";
 
