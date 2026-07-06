@@ -190,16 +190,27 @@ function ContactsPage() {
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((c) => (
               <div key={c.id} className="rounded-lg border bg-card p-4">
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0">
-                    <p className="font-medium">{c.name}</p>
-                    <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                      <Phone className="h-3 w-3" /> {c.phone}
+                <div className="flex items-start gap-3">
+                  <ContactAvatar name={c.name} avatarUrl={c.avatar_url} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{c.name}</p>
+                    <p className="mt-0.5 flex items-center gap-1 truncate text-sm text-muted-foreground">
+                      <Phone className="h-3 w-3 shrink-0" /> <span className="truncate">{c.phone}</span>
                     </p>
+                    {c.email && <p className="truncate text-xs text-muted-foreground">{c.email}</p>}
                   </div>
-                  <button onClick={() => remove(c.id)} className="text-muted-foreground hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      onClick={() => setEditing({ id: c.id, name: c.name, phone: c.phone, email: c.email, notes: c.notes, avatar_url: c.avatar_url })}
+                      className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title="Edit contact"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => remove(c.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive" title="Delete">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {c.tags.map((t) => (
