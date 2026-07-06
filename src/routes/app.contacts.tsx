@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Phone, Search, Tag as TagIcon, X } from "lucide-react";
+import { Plus, Trash2, Phone, Search, Tag as TagIcon, X, Pencil } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -14,6 +14,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "sonner";
+import { ContactAvatar } from "@/components/ContactAvatar";
+import { EditContactDialog, type EditableContact } from "@/components/EditContactDialog";
 
 export const Route = createFileRoute("/app/contacts")({
   component: ContactsPage,
@@ -24,6 +26,9 @@ type Contact = {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
+  notes: string | null;
+  avatar_url: string | null;
   created_at: string;
   tags: Tag[];
 };
