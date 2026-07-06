@@ -234,6 +234,15 @@ function ContactsPage() {
           </div>
         )}
       </div>
+      <EditContactDialog
+        open={!!editing}
+        onOpenChange={(v) => { if (!v) setEditing(null); }}
+        contact={editing}
+        onSaved={(u) => {
+          setContacts((prev) => prev.map((c) => c.id === u.id ? { ...c, name: u.name, phone: u.phone, email: u.email ?? null, notes: u.notes ?? null, avatar_url: u.avatar_url ?? null } : c));
+          setEditing(null);
+        }}
+      />
     </div>
   );
 }
