@@ -940,6 +940,23 @@ function ConversationsPage() {
           </>
         )}
       </section>
+      {lightbox && (
+        <MediaLightbox
+          path={lightbox.path}
+          kind={lightbox.kind}
+          filename={lightbox.filename}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+      <EditContactDialog
+        open={!!editingContact}
+        onOpenChange={(v) => { if (!v) setEditingContact(null); }}
+        contact={editingContact}
+        onSaved={(u) => {
+          setConversations((prev) => prev.map((c) => c.contact_id === u.id ? { ...c, contact: { ...c.contact, name: u.name, phone: u.phone, avatar_url: u.avatar_url ?? null } } : c));
+          setEditingContact(null);
+        }}
+      />
     </div>
   );
 }
