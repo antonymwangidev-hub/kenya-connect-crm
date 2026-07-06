@@ -69,6 +69,8 @@ type Message = {
   media_mime: string | null;
   media_filename: string | null;
   media_size: number | null;
+  reactions?: Reaction[] | null;
+  provider_message_id?: string | null;
 };
 
 
