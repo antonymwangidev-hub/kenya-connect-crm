@@ -53,8 +53,9 @@ type Conversation = {
   last_direction: string | null;
   last_inbound_at: string | null;
   unread_count: number;
-  contact: { id: string; name: string; phone: string };
+  contact: { id: string; name: string; phone: string; avatar_url: string | null };
 };
+type Reaction = { emoji: string; direction: "inbound" | "outbound"; at: string };
 type Message = {
   id: string;
   contact_id: string;
