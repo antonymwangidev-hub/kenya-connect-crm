@@ -756,24 +756,50 @@ function ConversationsPage() {
                             </span>
                           </div>
                         )}
-                        <div className={`flex ${out ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
-                          <div
-                            className="max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm"
-                            style={{
-                              backgroundColor: out ? "var(--bubble-out)" : "var(--bubble-in)",
-                              borderTopRightRadius: out ? 4 : undefined,
-                              borderTopLeftRadius: !out ? 4 : undefined,
-                            }}
-                          >
-                            {m.media_url && <MediaBubble m={m} />}
-                            {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
-                            <div className="mt-1 flex items-center justify-between gap-2">
-                              <ChannelBadge channel={m.channel ?? "manual"} />
-                              <p className="text-[10px] opacity-60">
-                                {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                              </p>
+                        <div className={`group flex items-end gap-1 ${out ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
+                          {out && (
+                            <ReactionPicker
+                              disabled={sending}
+                              onPick={(emoji) => {
+                                reactFn({ data: { messageId: m.id, emoji } })
+                                  .catch((err) => toast.error(err instanceof Error ? err.message : "Reaction failed"));
+                              }}
+                            />
+                          )}
+                          <div className="max-w-[85%] sm:max-w-[75%]">
+                            <div
+                              className="rounded-2xl px-3 py-2 text-sm shadow-sm sm:px-3.5"
+                              style={{
+                                backgroundColor: out ? "var(--bubble-out)" : "var(--bubble-in)",
+                                borderTopRightRadius: out ? 4 : undefined,
+                                borderTopLeftRadius: !out ? 4 : undefined,
+                              }}
+                            >
+                              {m.media_url && (
+                                <MediaBubble
+                                  m={m}
+                                  onOpenLightbox={(path, kind, filename) => setLightbox({ path, kind, filename })}
+                                />
+                              )}
+                              {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <ChannelBadge channel={m.channel ?? "manual"} />
+                                <p className="text-[10px] opacity-60">
+                                  {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                              </div>
                             </div>
+                            <ReactionsRow list={(m.reactions ?? []) as Reaction[]} />
                           </div>
+                          {!out && (
+                            <ReactionPicker
+                              disabled={sending}
+                              onPick={(emoji) => {
+                                reactFn({ data: { messageId: m.id, emoji } })
+                                  .catch((err) => toast.error(err instanceof Error ? err.message : "Reaction failed"));
+                              }}
+                            />
+                          )}
                         </div>
                       </div>
                     );
