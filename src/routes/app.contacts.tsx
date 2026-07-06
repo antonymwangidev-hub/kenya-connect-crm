@@ -47,6 +47,7 @@ function ContactsPage() {
   const [search, setSearch] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [editing, setEditing] = useState<EditableContact | null>(null);
 
   const load = async () => {
     if (!businessId) return;
