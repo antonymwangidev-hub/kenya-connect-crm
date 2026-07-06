@@ -672,7 +672,7 @@ function ConversationsPage() {
           </div>
         ) : (
           <>
-            <header className="flex items-center gap-3 border-b bg-card px-4 py-3">
+            <header className="flex items-center gap-2 border-b bg-card px-3 py-2 sm:px-4 sm:py-3">
               <button
                 onClick={() => setActiveId(null)}
                 className="rounded-md p-1 hover:bg-muted md:hidden"
@@ -680,13 +680,23 @@ function ConversationsPage() {
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                {active.contact.name.slice(0, 1).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{active.contact.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{active.contact.phone}</p>
-              </div>
+              <button
+                type="button"
+                onClick={() => setEditingContact({
+                  id: active.contact.id,
+                  name: active.contact.name,
+                  phone: active.contact.phone,
+                  avatar_url: active.contact.avatar_url,
+                })}
+                className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left hover:bg-muted/60"
+                title="Edit contact"
+              >
+                <ContactAvatar name={active.contact.name} avatarUrl={active.contact.avatar_url} size={36} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{active.contact.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{active.contact.phone}</p>
+                </div>
+              </button>
               <Button
                 type="button"
                 size="sm"
@@ -695,7 +705,7 @@ function ConversationsPage() {
                 onClick={() => setTemplateOpen(true)}
                 title="Send an approved WhatsApp template"
               >
-                <FileText className="h-3.5 w-3.5" /> Templates
+                <FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Templates</span>
               </Button>
             </header>
             <SessionBanner status={sessionStatus} />
