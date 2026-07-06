@@ -54,17 +54,20 @@ function ContactsPage() {
     const [{ data: cdata, error: cerr }, { data: tdata, error: terr }] = await Promise.all([
       supabase
         .from("contacts")
-        .select("id,name,phone,created_at,contact_tags(tag:tags(id,name))")
+        .select("id,name,phone,email,notes,avatar_url,created_at,contact_tags(tag:tags(id,name))")
         .eq("business_id", businessId)
         .order("created_at", { ascending: false }),
       supabase.from("tags").select("id,name").eq("business_id", businessId).order("name"),
     ]);
     if (cerr) toast.error(cerr.message);
     if (terr) toast.error(terr.message);
-    const mapped: Contact[] = (cdata ?? []).map((c: { id: string; name: string; phone: string; created_at: string; contact_tags: { tag: Tag | null }[] }) => ({
+    const mapped: Contact[] = (cdata ?? []).map((c: { id: string; name: string; phone: string; email: string | null; notes: string | null; avatar_url: string | null; created_at: string; contact_tags: { tag: Tag | null }[] }) => ({
       id: c.id,
       name: c.name,
       phone: c.phone,
+      email: c.email,
+      notes: c.notes,
+      avatar_url: c.avatar_url,
       created_at: c.created_at,
       tags: (c.contact_tags ?? []).map((ct) => ct.tag).filter((t): t is Tag => Boolean(t)),
     }));
