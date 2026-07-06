@@ -33,7 +33,7 @@ export const updateContact = createServerFn({ method: "POST" })
 
     const { data: updated, error } = await supabase
       .from("contacts")
-      .update(patch)
+      .update(patch as never)
       .eq("id", data.id)
       .select("id,name,phone,email,notes,avatar_url")
       .single();
