@@ -417,6 +417,14 @@ function ConversationsPage() {
           supabase.from("conversations").update({ unread_count: 0 }).eq("id", active.id).then(() => {});
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${active.id}` },
+        (payload) => {
+          const m = payload.new as Message;
+          setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...m } : x)));
+        },
+      )
       .subscribe();
 
     return () => { cancelled = true; supabase.removeChannel(channel); };
