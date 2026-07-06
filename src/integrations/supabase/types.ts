@@ -358,26 +358,35 @@ export type Database = {
       }
       contacts: {
         Row: {
+          avatar_url: string | null
           business_id: string
           created_at: string
+          email: string | null
           id: string
           name: string
+          notes: string | null
           phone: string
           stage: Database["public"]["Enums"]["contact_stage"]
         }
         Insert: {
+          avatar_url?: string | null
           business_id: string
           created_at?: string
+          email?: string | null
           id?: string
           name: string
+          notes?: string | null
           phone: string
           stage?: Database["public"]["Enums"]["contact_stage"]
         }
         Update: {
+          avatar_url?: string | null
           business_id?: string
           created_at?: string
+          email?: string | null
           id?: string
           name?: string
+          notes?: string | null
           phone?: string
           stage?: Database["public"]["Enums"]["contact_stage"]
         }
@@ -537,6 +546,8 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           provider_message_id: string | null
+          reactions: Json
+          reply_to_provider_id: string | null
         }
         Insert: {
           channel?: Database["public"]["Enums"]["message_channel"]
@@ -552,6 +563,8 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           provider_message_id?: string | null
+          reactions?: Json
+          reply_to_provider_id?: string | null
         }
         Update: {
           channel?: Database["public"]["Enums"]["message_channel"]
@@ -567,6 +580,8 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           provider_message_id?: string | null
+          reactions?: Json
+          reply_to_provider_id?: string | null
         }
         Relationships: [
           {
