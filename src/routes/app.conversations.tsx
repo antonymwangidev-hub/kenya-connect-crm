@@ -896,6 +896,7 @@ function ConversationsPage() {
                   <Paperclip className="h-4 w-4" />
                 </Button>
                 <Input
+                  ref={draftRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder={
@@ -906,6 +907,8 @@ function ConversationsPage() {
                   className="flex-1"
                   disabled={sending}
                 />
+                <EmojiPicker onPick={(e) => setDraft((d) => d + e)} />
+
                 <Button
                   type="button"
                   variant="outline"
