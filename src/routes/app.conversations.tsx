@@ -319,7 +319,11 @@ function ConversationsPage() {
   const sendFn = useServerFn(sendOutboundMessage);
   const suggestFn = useServerFn(suggestReply);
   const uploadUrlFn = useServerFn(createChatMediaUploadUrl);
+  const reactFn = useServerFn(reactToMessage);
   const [suggesting, setSuggesting] = useState(false);
+  const [lightbox, setLightbox] = useState<{ path: string; kind: "image" | "video"; filename: string | null } | null>(null);
+  const [editingContact, setEditingContact] = useState<EditableContact | null>(null);
+  const draftRef = useRef<HTMLInputElement>(null);
   const [generating, setGenerating] = useState(false);
   const [tone, setTone] = useState<Tone>("polite");
   const [conversations, setConversations] = useState<Conversation[]>([]);
