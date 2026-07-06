@@ -171,7 +171,7 @@ function SessionBanner({ status }: { status: ReturnType<typeof useSessionStatus>
   );
 }
 
-function MediaBubble({ m }: { m: Message }) {
+function MediaBubble({ m, onOpenLightbox }: { m: Message; onOpenLightbox: (path: string, kind: "image" | "video", filename: string | null) => void }) {
   const signFn = useServerFn(getChatMediaSignedUrl);
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -184,25 +184,69 @@ function MediaBubble({ m }: { m: Message }) {
   }, [m.media_url, signFn]);
   if (!m.media_url) return null;
   const kind = m.media_type ?? "document";
+  const downloadBtn = url ? (
+    <a
+      href={url}
+      download={m.media_filename ?? true}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-black/55 text-white opacity-0 backdrop-blur transition group-hover:opacity-100"
+      title="Download"
+      aria-label="Download"
+    >
+      <Download className="h-3.5 w-3.5" />
+    </a>
+  ) : null;
   if (kind === "image") {
-    return url ? (
-      <a href={url} target="_blank" rel="noreferrer">
-        <img src={url} alt={m.media_filename ?? ""} className="mb-1 max-h-64 rounded-lg object-cover" />
-      </a>
-    ) : <div className="mb-1 h-40 w-56 animate-pulse rounded-lg bg-black/10" />;
+    return (
+      <div className="group relative mb-1 overflow-hidden rounded-lg">
+        {url ? (
+          <button type="button" onClick={() => onOpenLightbox(m.media_url!, "image", m.media_filename)} className="block">
+            <img src={url} alt={m.media_filename ?? ""} className="max-h-72 w-auto max-w-full object-cover" loading="lazy" />
+          </button>
+        ) : (
+          <div className="h-40 w-56 animate-pulse bg-black/10" />
+        )}
+        {downloadBtn}
+      </div>
+    );
   }
   if (kind === "video") {
-    return url ? (
-      <video src={url} controls className="mb-1 max-h-64 rounded-lg" />
-    ) : <div className="mb-1 grid h-40 w-56 place-items-center rounded-lg bg-black/10"><Play className="h-6 w-6 opacity-60" /></div>;
+    return (
+      <div className="group relative mb-1 overflow-hidden rounded-lg">
+        {url ? (
+          <video src={url} controls className="max-h-72 w-full max-w-full rounded-lg" preload="metadata" playsInline />
+        ) : (
+          <div className="grid h-40 w-56 place-items-center bg-black/10"><Play className="h-6 w-6 opacity-60" /></div>
+        )}
+        {url && (
+          <button
+            type="button"
+            onClick={() => onOpenLightbox(m.media_url!, "video", m.media_filename)}
+            className="absolute right-9 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-black/55 text-white opacity-0 backdrop-blur transition group-hover:opacity-100"
+            title="Open full screen"
+          >
+            <Play className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {downloadBtn}
+      </div>
+    );
   }
   if (kind === "audio") {
-    return url ? <audio src={url} controls className="mb-1 w-full" /> : <div className="mb-1 h-10 w-56 animate-pulse rounded bg-black/10" />;
+    return url ? (
+      <div className="mb-1 flex items-center gap-2">
+        <audio src={url} controls className="w-full min-w-[180px] max-w-[260px]" />
+        <a href={url} download={m.media_filename ?? true} className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/10 hover:bg-black/20" title="Download">
+          <Download className="h-3.5 w-3.5" />
+        </a>
+      </div>
+    ) : <div className="mb-1 h-10 w-56 animate-pulse rounded bg-black/10" />;
   }
   return (
     <a
       href={url ?? "#"}
-      target="_blank"
+      download={m.media_filename ?? true}
+      target={url ? undefined : "_blank"}
       rel="noreferrer"
       className="mb-1 flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-xs hover:bg-black/10"
     >
@@ -210,6 +254,63 @@ function MediaBubble({ m }: { m: Message }) {
       <span className="min-w-0 flex-1 truncate">{m.media_filename ?? "Attachment"}</span>
       <Download className="h-3.5 w-3.5 opacity-60" />
     </a>
+  );
+}
+
+function ReactionsRow({ list }: { list: Reaction[] }) {
+  if (!list || list.length === 0) return null;
+  // Group by emoji
+  const grouped = new Map<string, number>();
+  for (const r of list) grouped.set(r.emoji, (grouped.get(r.emoji) ?? 0) + 1);
+  return (
+    <div className="mt-0.5 flex flex-wrap gap-1">
+      {Array.from(grouped.entries()).map(([e, n]) => (
+        <span key={e} className="inline-flex items-center gap-0.5 rounded-full bg-background/90 px-1.5 py-0.5 text-[11px] shadow-sm ring-1 ring-black/5">
+          <span>{e}</span>{n > 1 && <span className="text-[9px] text-muted-foreground">{n}</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ReactionPicker({ onPick, disabled }: { onPick: (emoji: string) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="grid h-6 w-6 place-items-center rounded-full bg-background/90 text-muted-foreground opacity-0 shadow-sm ring-1 ring-black/5 transition group-hover:opacity-100 disabled:opacity-30"
+          title="React"
+          aria-label="React"
+        >
+          <SmilePlus className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-1" align="center">
+        <div className="flex gap-0.5">
+          {QUICK_REACTIONS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => { onPick(e); setOpen(false); }}
+              className="grid h-8 w-8 place-items-center rounded-md text-lg hover:bg-muted"
+            >
+              {e}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => { onPick(""); setOpen(false); }}
+            className="grid h-8 w-8 place-items-center rounded-md text-xs text-muted-foreground hover:bg-muted"
+            title="Clear"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
