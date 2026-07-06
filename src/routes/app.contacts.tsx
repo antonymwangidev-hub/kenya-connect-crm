@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Phone, Search, Tag as TagIcon, X } from "lucide-react";
+import { Plus, Trash2, Phone, Search, Tag as TagIcon, X, Pencil } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -14,6 +14,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "sonner";
+import { ContactAvatar } from "@/components/ContactAvatar";
+import { EditContactDialog, type EditableContact } from "@/components/EditContactDialog";
 
 export const Route = createFileRoute("/app/contacts")({
   component: ContactsPage,
@@ -24,6 +26,9 @@ type Contact = {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
+  notes: string | null;
+  avatar_url: string | null;
   created_at: string;
   tags: Tag[];
 };
@@ -42,6 +47,7 @@ function ContactsPage() {
   const [search, setSearch] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [editing, setEditing] = useState<EditableContact | null>(null);
 
   const load = async () => {
     if (!businessId) return;
@@ -49,17 +55,20 @@ function ContactsPage() {
     const [{ data: cdata, error: cerr }, { data: tdata, error: terr }] = await Promise.all([
       supabase
         .from("contacts")
-        .select("id,name,phone,created_at,contact_tags(tag:tags(id,name))")
+        .select("id,name,phone,email,notes,avatar_url,created_at,contact_tags(tag:tags(id,name))")
         .eq("business_id", businessId)
         .order("created_at", { ascending: false }),
       supabase.from("tags").select("id,name").eq("business_id", businessId).order("name"),
     ]);
     if (cerr) toast.error(cerr.message);
     if (terr) toast.error(terr.message);
-    const mapped: Contact[] = (cdata ?? []).map((c: { id: string; name: string; phone: string; created_at: string; contact_tags: { tag: Tag | null }[] }) => ({
+    const mapped: Contact[] = (cdata ?? []).map((c: { id: string; name: string; phone: string; email: string | null; notes: string | null; avatar_url: string | null; created_at: string; contact_tags: { tag: Tag | null }[] }) => ({
       id: c.id,
       name: c.name,
       phone: c.phone,
+      email: c.email,
+      notes: c.notes,
+      avatar_url: c.avatar_url,
       created_at: c.created_at,
       tags: (c.contact_tags ?? []).map((ct) => ct.tag).filter((t): t is Tag => Boolean(t)),
     }));
@@ -181,16 +190,27 @@ function ContactsPage() {
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((c) => (
               <div key={c.id} className="rounded-lg border bg-card p-4">
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0">
-                    <p className="font-medium">{c.name}</p>
-                    <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                      <Phone className="h-3 w-3" /> {c.phone}
+                <div className="flex items-start gap-3">
+                  <ContactAvatar name={c.name} avatarUrl={c.avatar_url} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{c.name}</p>
+                    <p className="mt-0.5 flex items-center gap-1 truncate text-sm text-muted-foreground">
+                      <Phone className="h-3 w-3 shrink-0" /> <span className="truncate">{c.phone}</span>
                     </p>
+                    {c.email && <p className="truncate text-xs text-muted-foreground">{c.email}</p>}
                   </div>
-                  <button onClick={() => remove(c.id)} className="text-muted-foreground hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      onClick={() => setEditing({ id: c.id, name: c.name, phone: c.phone, email: c.email, notes: c.notes, avatar_url: c.avatar_url })}
+                      className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title="Edit contact"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => remove(c.id)} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive" title="Delete">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {c.tags.map((t) => (
@@ -214,6 +234,15 @@ function ContactsPage() {
           </div>
         )}
       </div>
+      <EditContactDialog
+        open={!!editing}
+        onOpenChange={(v) => { if (!v) setEditing(null); }}
+        contact={editing}
+        onSaved={(u) => {
+          setContacts((prev) => prev.map((c) => c.id === u.id ? { ...c, name: u.name, phone: u.phone, email: u.email ?? null, notes: u.notes ?? null, avatar_url: u.avatar_url ?? null } : c));
+          setEditing(null);
+        }}
+      />
     </div>
   );
 }

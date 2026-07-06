@@ -27,8 +27,15 @@ import { toast } from "sonner";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { suggestReply } from "@/lib/ai.functions";
 import { createChatMediaUploadUrl, getChatMediaSignedUrl } from "@/lib/media.functions";
+import { reactToMessage } from "@/lib/reactions.functions";
 import { SendTemplateModal } from "@/components/SendTemplateModal";
 import { MediaComposerPreview, uploadWithProgress } from "@/components/MediaComposer";
+import { ContactAvatar } from "@/components/ContactAvatar";
+import { EmojiPicker, QUICK_REACTIONS } from "@/components/EmojiPicker";
+import { MediaLightbox } from "@/components/MediaLightbox";
+import { EditContactDialog, type EditableContact } from "@/components/EditContactDialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SmilePlus } from "lucide-react";
 
 type Tone = "polite" | "sales" | "urgent";
 
@@ -46,8 +53,9 @@ type Conversation = {
   last_direction: string | null;
   last_inbound_at: string | null;
   unread_count: number;
-  contact: { id: string; name: string; phone: string };
+  contact: { id: string; name: string; phone: string; avatar_url: string | null };
 };
+type Reaction = { emoji: string; direction: "inbound" | "outbound"; at: string };
 type Message = {
   id: string;
   contact_id: string;
@@ -61,6 +69,8 @@ type Message = {
   media_mime: string | null;
   media_filename: string | null;
   media_size: number | null;
+  reactions?: Reaction[] | null;
+  provider_message_id?: string | null;
 };
 
 
@@ -161,7 +171,7 @@ function SessionBanner({ status }: { status: ReturnType<typeof useSessionStatus>
   );
 }
 
-function MediaBubble({ m }: { m: Message }) {
+function MediaBubble({ m, onOpenLightbox }: { m: Message; onOpenLightbox: (path: string, kind: "image" | "video", filename: string | null) => void }) {
   const signFn = useServerFn(getChatMediaSignedUrl);
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -174,25 +184,69 @@ function MediaBubble({ m }: { m: Message }) {
   }, [m.media_url, signFn]);
   if (!m.media_url) return null;
   const kind = m.media_type ?? "document";
+  const downloadBtn = url ? (
+    <a
+      href={url}
+      download={m.media_filename ?? true}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-black/55 text-white opacity-0 backdrop-blur transition group-hover:opacity-100"
+      title="Download"
+      aria-label="Download"
+    >
+      <Download className="h-3.5 w-3.5" />
+    </a>
+  ) : null;
   if (kind === "image") {
-    return url ? (
-      <a href={url} target="_blank" rel="noreferrer">
-        <img src={url} alt={m.media_filename ?? ""} className="mb-1 max-h-64 rounded-lg object-cover" />
-      </a>
-    ) : <div className="mb-1 h-40 w-56 animate-pulse rounded-lg bg-black/10" />;
+    return (
+      <div className="group relative mb-1 overflow-hidden rounded-lg">
+        {url ? (
+          <button type="button" onClick={() => onOpenLightbox(m.media_url!, "image", m.media_filename)} className="block">
+            <img src={url} alt={m.media_filename ?? ""} className="max-h-72 w-auto max-w-full object-cover" loading="lazy" />
+          </button>
+        ) : (
+          <div className="h-40 w-56 animate-pulse bg-black/10" />
+        )}
+        {downloadBtn}
+      </div>
+    );
   }
   if (kind === "video") {
-    return url ? (
-      <video src={url} controls className="mb-1 max-h-64 rounded-lg" />
-    ) : <div className="mb-1 grid h-40 w-56 place-items-center rounded-lg bg-black/10"><Play className="h-6 w-6 opacity-60" /></div>;
+    return (
+      <div className="group relative mb-1 overflow-hidden rounded-lg">
+        {url ? (
+          <video src={url} controls className="max-h-72 w-full max-w-full rounded-lg" preload="metadata" playsInline />
+        ) : (
+          <div className="grid h-40 w-56 place-items-center bg-black/10"><Play className="h-6 w-6 opacity-60" /></div>
+        )}
+        {url && (
+          <button
+            type="button"
+            onClick={() => onOpenLightbox(m.media_url!, "video", m.media_filename)}
+            className="absolute right-9 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-black/55 text-white opacity-0 backdrop-blur transition group-hover:opacity-100"
+            title="Open full screen"
+          >
+            <Play className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {downloadBtn}
+      </div>
+    );
   }
   if (kind === "audio") {
-    return url ? <audio src={url} controls className="mb-1 w-full" /> : <div className="mb-1 h-10 w-56 animate-pulse rounded bg-black/10" />;
+    return url ? (
+      <div className="mb-1 flex items-center gap-2">
+        <audio src={url} controls className="w-full min-w-[180px] max-w-[260px]" />
+        <a href={url} download={m.media_filename ?? true} className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/10 hover:bg-black/20" title="Download">
+          <Download className="h-3.5 w-3.5" />
+        </a>
+      </div>
+    ) : <div className="mb-1 h-10 w-56 animate-pulse rounded bg-black/10" />;
   }
   return (
     <a
       href={url ?? "#"}
-      target="_blank"
+      download={m.media_filename ?? true}
+      target={url ? undefined : "_blank"}
       rel="noreferrer"
       className="mb-1 flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-xs hover:bg-black/10"
     >
@@ -203,12 +257,73 @@ function MediaBubble({ m }: { m: Message }) {
   );
 }
 
+function ReactionsRow({ list }: { list: Reaction[] }) {
+  if (!list || list.length === 0) return null;
+  // Group by emoji
+  const grouped = new Map<string, number>();
+  for (const r of list) grouped.set(r.emoji, (grouped.get(r.emoji) ?? 0) + 1);
+  return (
+    <div className="mt-0.5 flex flex-wrap gap-1">
+      {Array.from(grouped.entries()).map(([e, n]) => (
+        <span key={e} className="inline-flex items-center gap-0.5 rounded-full bg-background/90 px-1.5 py-0.5 text-[11px] shadow-sm ring-1 ring-black/5">
+          <span>{e}</span>{n > 1 && <span className="text-[9px] text-muted-foreground">{n}</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ReactionPicker({ onPick, disabled }: { onPick: (emoji: string) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="grid h-6 w-6 place-items-center rounded-full bg-background/90 text-muted-foreground opacity-0 shadow-sm ring-1 ring-black/5 transition group-hover:opacity-100 disabled:opacity-30"
+          title="React"
+          aria-label="React"
+        >
+          <SmilePlus className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-1" align="center">
+        <div className="flex gap-0.5">
+          {QUICK_REACTIONS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => { onPick(e); setOpen(false); }}
+              className="grid h-8 w-8 place-items-center rounded-md text-lg hover:bg-muted"
+            >
+              {e}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => { onPick(""); setOpen(false); }}
+            className="grid h-8 w-8 place-items-center rounded-md text-xs text-muted-foreground hover:bg-muted"
+            title="Clear"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function ConversationsPage() {
   const { businessId } = useAuth();
   const sendFn = useServerFn(sendOutboundMessage);
   const suggestFn = useServerFn(suggestReply);
   const uploadUrlFn = useServerFn(createChatMediaUploadUrl);
+  const reactFn = useServerFn(reactToMessage);
   const [suggesting, setSuggesting] = useState(false);
+  const [lightbox, setLightbox] = useState<{ path: string; kind: "image" | "video"; filename: string | null } | null>(null);
+  const [editingContact, setEditingContact] = useState<EditableContact | null>(null);
+  const draftRef = useRef<HTMLInputElement>(null);
   const [generating, setGenerating] = useState(false);
   const [tone, setTone] = useState<Tone>("polite");
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -238,7 +353,7 @@ function ConversationsPage() {
       if (initial) setConvLoading(true);
       const { data, error } = await supabase
         .from("conversations")
-        .select("id,contact_id,last_message_at,last_message_preview,last_direction,last_inbound_at,unread_count,contact:contacts!inner(id,name,phone)")
+        .select("id,contact_id,last_message_at,last_message_preview,last_direction,last_inbound_at,unread_count,contact:contacts!inner(id,name,phone,avatar_url)")
         .eq("business_id", businessId)
         .order("last_message_at", { ascending: false });
       if (cancelled) return;
@@ -300,6 +415,14 @@ function ConversationsPage() {
           const m = payload.new as Message;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
           supabase.from("conversations").update({ unread_count: 0 }).eq("id", active.id).then(() => {});
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${active.id}` },
+        (payload) => {
+          const m = payload.new as Message;
+          setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...m } : x)));
         },
       )
       .subscribe();
@@ -549,7 +672,7 @@ function ConversationsPage() {
           </div>
         ) : (
           <>
-            <header className="flex items-center gap-3 border-b bg-card px-4 py-3">
+            <header className="flex items-center gap-2 border-b bg-card px-3 py-2 sm:px-4 sm:py-3">
               <button
                 onClick={() => setActiveId(null)}
                 className="rounded-md p-1 hover:bg-muted md:hidden"
@@ -557,13 +680,23 @@ function ConversationsPage() {
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                {active.contact.name.slice(0, 1).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{active.contact.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{active.contact.phone}</p>
-              </div>
+              <button
+                type="button"
+                onClick={() => setEditingContact({
+                  id: active.contact.id,
+                  name: active.contact.name,
+                  phone: active.contact.phone,
+                  avatar_url: active.contact.avatar_url,
+                })}
+                className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left hover:bg-muted/60"
+                title="Edit contact"
+              >
+                <ContactAvatar name={active.contact.name} avatarUrl={active.contact.avatar_url} size={36} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{active.contact.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{active.contact.phone}</p>
+                </div>
+              </button>
               <Button
                 type="button"
                 size="sm"
@@ -572,7 +705,7 @@ function ConversationsPage() {
                 onClick={() => setTemplateOpen(true)}
                 title="Send an approved WhatsApp template"
               >
-                <FileText className="h-3.5 w-3.5" /> Templates
+                <FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Templates</span>
               </Button>
             </header>
             <SessionBanner status={sessionStatus} />
@@ -623,24 +756,50 @@ function ConversationsPage() {
                             </span>
                           </div>
                         )}
-                        <div className={`flex ${out ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
-                          <div
-                            className="max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm"
-                            style={{
-                              backgroundColor: out ? "var(--bubble-out)" : "var(--bubble-in)",
-                              borderTopRightRadius: out ? 4 : undefined,
-                              borderTopLeftRadius: !out ? 4 : undefined,
-                            }}
-                          >
-                            {m.media_url && <MediaBubble m={m} />}
-                            {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
-                            <div className="mt-1 flex items-center justify-between gap-2">
-                              <ChannelBadge channel={m.channel ?? "manual"} />
-                              <p className="text-[10px] opacity-60">
-                                {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                              </p>
+                        <div className={`group flex items-end gap-1 ${out ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
+                          {out && (
+                            <ReactionPicker
+                              disabled={sending}
+                              onPick={(emoji) => {
+                                reactFn({ data: { messageId: m.id, emoji } })
+                                  .catch((err) => toast.error(err instanceof Error ? err.message : "Reaction failed"));
+                              }}
+                            />
+                          )}
+                          <div className="max-w-[85%] sm:max-w-[75%]">
+                            <div
+                              className="rounded-2xl px-3 py-2 text-sm shadow-sm sm:px-3.5"
+                              style={{
+                                backgroundColor: out ? "var(--bubble-out)" : "var(--bubble-in)",
+                                borderTopRightRadius: out ? 4 : undefined,
+                                borderTopLeftRadius: !out ? 4 : undefined,
+                              }}
+                            >
+                              {m.media_url && (
+                                <MediaBubble
+                                  m={m}
+                                  onOpenLightbox={(path, kind, filename) => setLightbox({ path, kind, filename })}
+                                />
+                              )}
+                              {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <ChannelBadge channel={m.channel ?? "manual"} />
+                                <p className="text-[10px] opacity-60">
+                                  {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                              </div>
                             </div>
+                            <ReactionsRow list={(m.reactions ?? []) as Reaction[]} />
                           </div>
+                          {!out && (
+                            <ReactionPicker
+                              disabled={sending}
+                              onPick={(emoji) => {
+                                reactFn({ data: { messageId: m.id, emoji } })
+                                  .catch((err) => toast.error(err instanceof Error ? err.message : "Reaction failed"));
+                              }}
+                            />
+                          )}
                         </div>
                       </div>
                     );
@@ -737,6 +896,7 @@ function ConversationsPage() {
                   <Paperclip className="h-4 w-4" />
                 </Button>
                 <Input
+                  ref={draftRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder={
@@ -747,6 +907,8 @@ function ConversationsPage() {
                   className="flex-1"
                   disabled={sending}
                 />
+                <EmojiPicker onPick={(e) => setDraft((d) => d + e)} />
+
                 <Button
                   type="button"
                   variant="outline"
@@ -778,6 +940,23 @@ function ConversationsPage() {
           </>
         )}
       </section>
+      {lightbox && (
+        <MediaLightbox
+          path={lightbox.path}
+          kind={lightbox.kind}
+          filename={lightbox.filename}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+      <EditContactDialog
+        open={!!editingContact}
+        onOpenChange={(v) => { if (!v) setEditingContact(null); }}
+        contact={editingContact}
+        onSaved={(u) => {
+          setConversations((prev) => prev.map((c) => c.contact_id === u.id ? { ...c, contact: { ...c.contact, name: u.name, phone: u.phone, avatar_url: u.avatar_url ?? null } } : c));
+          setEditingContact(null);
+        }}
+      />
     </div>
   );
 }

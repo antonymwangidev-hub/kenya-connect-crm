@@ -394,6 +394,33 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   matched_business_ids: businessIds,
                 });
                 const phone = whatsappPhone(from);
+
+                // Reaction messages update the target message's reactions
+                // instead of inserting a new row in the transcript.
+                if (m?.type === "reaction" && m?.reaction?.message_id) {
+                  const targetProviderId: string = m.reaction.message_id;
+                  const emoji: string = m.reaction.emoji ?? "";
+                  for (const businessId of businessIds) {
+                    try {
+                      const { data: target } = await supabaseAdmin
+                        .from("messages")
+                        .select("id,reactions,contact_id")
+                        .eq("provider_message_id", targetProviderId)
+                        .maybeSingle();
+                      if (!target) continue;
+                      const list = Array.isArray(target.reactions) ? (target.reactions as unknown as Array<{ emoji: string; direction: string; at: string }>) : [];
+                      const withoutTheirs = list.filter((r) => r.direction !== "inbound");
+                      const next = emoji
+                        ? [...withoutTheirs, { emoji, direction: "inbound", at: new Date().toISOString() }]
+                        : withoutTheirs;
+                      await supabaseAdmin.from("messages").update({ reactions: next as never }).eq("id", target.id);
+                    } catch (rxErr) {
+                      console.error("[WA webhook] reaction update failed", rxErr, { businessId });
+                    }
+                  }
+                  continue;
+                }
+
                 const mediaKind = (
                   ["image", "video", "audio", "document", "sticker"] as const
                 ).find((k) => m?.[k]);
