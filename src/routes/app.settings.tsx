@@ -19,6 +19,7 @@ import {
   saveAiAssistantSettings,
   type AiAssistantSettings,
 } from "@/lib/ai-assistant.functions";
+import { KnowledgeBaseSection } from "@/components/KnowledgeBaseSection";
 
 export const Route = createFileRoute("/app/settings")({
   component: SettingsPage,
@@ -114,6 +115,8 @@ function SettingsPage() {
           faqs: merged.faqs ?? "",
           tone: (merged.tone ?? "friendly") as "friendly" | "professional" | "casual" | "sales",
           custom_instructions: merged.custom_instructions ?? "",
+          strict_knowledge: merged.strict_knowledge !== false,
+          fallback_message: merged.fallback_message ?? "",
         },
       });
       toast.success("AI assistant saved");
