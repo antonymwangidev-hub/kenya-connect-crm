@@ -46,6 +46,45 @@ async function getSbAdmin() {
   return supabaseAdmin;
 }
 
+/**
+ * Verify the signed-in user owns a business that is linked to the given WABA
+ * (and phone number id, when supplied). Throws when the caller does not.
+ */
+async function assertOwnsWaba(
+  supabase: Awaited<ReturnType<typeof getSbAdmin>>,
+  userId: string,
+  wabaId: string,
+  phoneNumberId: string | null,
+): Promise<void> {
+  const { data: businesses } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("owner_id", userId);
+  const businessIds = (businesses ?? []).map((b) => b.id);
+  if (businessIds.length === 0) throw new Error("Forbidden: WhatsApp account not found");
+
+  let accQuery = supabase
+    .from("whatsapp_business_accounts")
+    .select("id")
+    .in("business_id", businessIds)
+    .eq("waba_id", wabaId);
+  if (phoneNumberId) accQuery = accQuery.eq("phone_number_id", phoneNumberId);
+  const { data: acc } = await accQuery.limit(1).maybeSingle();
+  if (acc) return;
+
+  let connQuery = supabase
+    .from("whatsapp_connections")
+    .select("id")
+    .in("business_id", businessIds)
+    .eq("waba_id", wabaId)
+    .neq("status", "disconnected");
+  if (phoneNumberId) connQuery = connQuery.eq("phone_number_id", phoneNumberId);
+  const { data: conn } = await connQuery.limit(1).maybeSingle();
+  if (conn) return;
+
+  throw new Error("Forbidden: WhatsApp account not found");
+}
+
 export const listWhatsappAccountsForDiagnostics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
