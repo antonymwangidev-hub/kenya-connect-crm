@@ -14,6 +14,8 @@ export type AiAssistantSettings = {
   faqs: string | null;
   tone: string;
   custom_instructions: string | null;
+  strict_knowledge: boolean;
+  fallback_message: string | null;
 };
 
 const DEFAULTS = {
@@ -27,6 +29,8 @@ const DEFAULTS = {
   faqs: "",
   tone: "friendly",
   custom_instructions: "",
+  strict_knowledge: true,
+  fallback_message: "",
 };
 
 export const getAiAssistantSettings = createServerFn({ method: "GET" })
@@ -49,15 +53,17 @@ export const saveAiAssistantSettings = createServerFn({ method: "POST" })
     z
       .object({
         enabled: z.boolean(),
-        business_description: z.string().max(4000).optional().default(""),
-        products_services: z.string().max(8000).optional().default(""),
+        business_description: z.string().max(20000).optional().default(""),
+        products_services: z.string().max(50000).optional().default(""),
         contact_info: z.string().max(2000).optional().default(""),
         address: z.string().max(1000).optional().default(""),
         website: z.string().max(500).optional().default(""),
         hours: z.string().max(1000).optional().default(""),
-        faqs: z.string().max(8000).optional().default(""),
+        faqs: z.string().max(50000).optional().default(""),
         tone: z.enum(["friendly", "professional", "casual", "sales"]).default("friendly"),
-        custom_instructions: z.string().max(4000).optional().default(""),
+        custom_instructions: z.string().max(20000).optional().default(""),
+        strict_knowledge: z.boolean().optional().default(true),
+        fallback_message: z.string().max(1000).optional().default(""),
       })
       .parse(input),
   )

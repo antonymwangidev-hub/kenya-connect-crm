@@ -22,9 +22,11 @@ export type Database = {
           contact_info: string | null
           custom_instructions: string | null
           enabled: boolean
+          fallback_message: string | null
           faqs: string | null
           hours: string | null
           products_services: string | null
+          strict_knowledge: boolean
           tone: string
           updated_at: string
           website: string | null
@@ -36,9 +38,11 @@ export type Database = {
           contact_info?: string | null
           custom_instructions?: string | null
           enabled?: boolean
+          fallback_message?: string | null
           faqs?: string | null
           hours?: string | null
           products_services?: string | null
+          strict_knowledge?: boolean
           tone?: string
           updated_at?: string
           website?: string | null
@@ -50,9 +54,11 @@ export type Database = {
           contact_info?: string | null
           custom_instructions?: string | null
           enabled?: boolean
+          fallback_message?: string | null
           faqs?: string | null
           hours?: string | null
           products_services?: string | null
+          strict_knowledge?: boolean
           tone?: string
           updated_at?: string
           website?: string | null
@@ -62,6 +68,53 @@ export type Database = {
             foreignKeyName: "ai_assistant_settings_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_knowledge_entries: {
+        Row: {
+          business_id: string
+          category: string
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          keywords: string | null
+          priority: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          keywords?: string | null
+          priority?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          keywords?: string | null
+          priority?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_knowledge_entries_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
             referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
