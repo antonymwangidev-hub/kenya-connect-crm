@@ -300,13 +300,40 @@ function SettingsPage() {
                 </select>
               </div>
               <div>
-                <Label>Custom instructions (optional)</Label>
+                <Label>Fallback reply (when the answer isn&apos;t in the knowledge base)</Label>
                 <Input
-                  placeholder="e.g. Always ask for the customer's location before quoting delivery"
-                  value={ai.custom_instructions ?? ""}
-                  onChange={(e) => updateAi({ custom_instructions: e.target.value })}
+                  placeholder="Let me confirm that with the team and get back to you shortly."
+                  value={ai.fallback_message ?? ""}
+                  onChange={(e) => updateAi({ fallback_message: e.target.value })}
                 />
               </div>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 rounded-xl border bg-muted/30 p-3">
+              <div>
+                <div className="text-sm font-medium">Strict knowledge mode</div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  The AI answers only from your knowledge base and business info. If a fact isn&apos;t there,
+                  it sends your fallback reply instead of guessing.
+                </p>
+              </div>
+              <Switch
+                checked={ai.strict_knowledge !== false}
+                onCheckedChange={(v) => updateAi({ strict_knowledge: v })}
+              />
+            </div>
+
+            <div>
+              <Label>Custom instructions</Label>
+              <Textarea
+                rows={8}
+                placeholder={"Tell the AI how to behave.\n\nExamples:\n- Always greet by name if you know it.\n- Ask for the customer's location before quoting delivery.\n- Never promise discounts; offer to connect them with sales.\n- If someone asks for the manager, take their name and say we'll call back."}
+                value={ai.custom_instructions ?? ""}
+                onChange={(e) => updateAi({ custom_instructions: e.target.value })}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {(ai.custom_instructions ?? "").length.toLocaleString()} / 20,000 characters
+              </p>
             </div>
 
             <Button onClick={() => persistAi()} disabled={savingAi}>
@@ -315,6 +342,9 @@ function SettingsPage() {
           </div>
         )}
       </section>
+
+      <KnowledgeBaseSection />
+
 
 
       <section className="space-y-3 rounded-2xl border bg-card p-5">
