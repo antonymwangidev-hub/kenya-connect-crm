@@ -191,8 +191,9 @@ export const resubscribeWhatsappWebhook = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const supabase = await getSbAdmin();
+    await assertOwnsWaba(supabase, context.userId, data.wabaId, data.phoneNumberId ?? null);
     const token = await resolveTokenForWaba(supabase, data.wabaId, data.phoneNumberId ?? null);
     if (!token) {
       return { ok: false as const, error: "No access token found for this WABA" };
