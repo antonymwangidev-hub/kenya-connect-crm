@@ -24,6 +24,7 @@ import { Route as AppPerformanceRouteImport } from './routes/app.performance'
 import { Route as AppOnboardingRouteImport } from './routes/app.onboarding'
 import { Route as AppLogsRouteImport } from './routes/app.logs'
 import { Route as AppInsightsRouteImport } from './routes/app.insights'
+import { Route as AppInboxRouteImport } from './routes/app.inbox'
 import { Route as AppConversationsRouteImport } from './routes/app.conversations'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
 import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
@@ -109,6 +110,11 @@ const AppInsightsRoute = AppInsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInboxRoute = AppInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConversationsRoute = AppConversationsRouteImport.update({
   id: '/conversations',
   path: '/conversations',
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/inbox': typeof AppInboxRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByTo {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/inbox': typeof AppInboxRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/inbox': typeof AppInboxRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -246,6 +255,7 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/inbox'
     | '/app/insights'
     | '/app/logs'
     | '/app/onboarding'
@@ -272,6 +282,7 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/inbox'
     | '/app/insights'
     | '/app/logs'
     | '/app/onboarding'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/inbox'
     | '/app/insights'
     | '/app/logs'
     | '/app/onboarding'
@@ -434,6 +446,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInsightsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/inbox': {
+      id: '/app/inbox'
+      path: '/inbox'
+      fullPath: '/app/inbox'
+      preLoaderRoute: typeof AppInboxRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/conversations': {
       id: '/app/conversations'
       path: '/conversations'
@@ -506,6 +525,7 @@ interface AppRouteChildren {
   AppBroadcastsRoute: typeof AppBroadcastsRoute
   AppContactsRoute: typeof AppContactsRoute
   AppConversationsRoute: typeof AppConversationsRoute
+  AppInboxRoute: typeof AppInboxRoute
   AppInsightsRoute: typeof AppInsightsRoute
   AppLogsRoute: typeof AppLogsRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
@@ -525,6 +545,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBroadcastsRoute: AppBroadcastsRoute,
   AppContactsRoute: AppContactsRoute,
   AppConversationsRoute: AppConversationsRoute,
+  AppInboxRoute: AppInboxRoute,
   AppInsightsRoute: AppInsightsRoute,
   AppLogsRoute: AppLogsRoute,
   AppOnboardingRoute: AppOnboardingRoute,
