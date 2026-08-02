@@ -8,24 +8,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // status, labels, notes) is done straight from the client under RLS.
 // ---------------------------------------------------------------------------
 
-async function assertOwner(supabase: NonNullable<Awaited<ReturnType<typeof getCtx>>>, businessId: string) {
-  const { data, error } = await supabase
-    .from("businesses")
-    .select("id,owner_id")
-    .eq("id", businessId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Business not found");
-  return data;
-}
-
-// helper only for typing above
-async function getCtx() {
-  return null as unknown as import("@supabase/supabase-js").SupabaseClient<
-    import("@/integrations/supabase/types").Database
-  >;
-}
-
 export const inviteTeamMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -40,8 +22,16 @@ export const inviteTeamMember = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const business = await assertOwner(supabase, data.businessId);
-    if (business.owner_id !== userId) throw new Error("Only the workspace owner can invite teammates");
+
+    const { data: business, error: bErr } = await supabase
+      .from("businesses")
+      .select("id,owner_id")
+      .eq("id", data.businessId)
+      .maybeSingle();
+    if (bErr) throw new Error(bErr.message);
+    if (!business || business.owner_id !== userId) {
+      throw new Error("Only the workspace owner can invite teammates");
+    }
 
     const email = data.email.toLowerCase();
 
@@ -80,8 +70,13 @@ export const relinkTeamMembers = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ businessId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const business = await assertOwner(supabase, data.businessId);
-    if (business.owner_id !== userId) throw new Error("Only the workspace owner can do this");
+
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("id,owner_id")
+      .eq("id", data.businessId)
+      .maybeSingle();
+    if (!business || business.owner_id !== userId) throw new Error("Only the workspace owner can do this");
 
     const { data: pending } = await supabase
       .from("business_members")
