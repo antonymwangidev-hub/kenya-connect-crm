@@ -8,6 +8,7 @@ export const Route = createFileRoute("/app")({
 });
 
 const nav = [
+  { to: "/app/inbox", label: "Inbox", icon: MessageCircle },
   { to: "/app/conversations", label: "Chats", icon: MessageCircle },
   { to: "/app/contacts", label: "Contacts", icon: Users },
   { to: "/app/pipeline", label: "Pipeline", icon: KanbanSquare },

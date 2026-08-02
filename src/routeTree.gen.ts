@@ -30,6 +30,7 @@ import { Route as AppContactsRouteImport } from './routes/app.contacts'
 import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
 import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
+import { Route as AppInboxConversationIdRouteImport } from './routes/app.inbox.$conversationId'
 import { Route as ApiPublicRunRemindersRouteImport } from './routes/api/public/run-reminders'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 import { Route as ApiPublicMpesaWebhookRouteImport } from './routes/api/public/mpesa.webhook'
@@ -140,6 +141,11 @@ const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInboxConversationIdRoute = AppInboxConversationIdRouteImport.update({
+  id: '/$conversationId',
+  path: '/$conversationId',
+  getParentRoute: () => AppInboxRoute,
+} as any)
 const ApiPublicRunRemindersRoute = ApiPublicRunRemindersRouteImport.update({
   id: '/api/public/run-reminders',
   path: '/api/public/run-reminders',
@@ -171,7 +177,7 @@ export interface FileRoutesByFullPath {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
-  '/app/inbox': typeof AppInboxRoute
+  '/app/inbox': typeof AppInboxRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -198,7 +205,7 @@ export interface FileRoutesByTo {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
-  '/app/inbox': typeof AppInboxRoute
+  '/app/inbox': typeof AppInboxRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByTo {
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -226,7 +234,7 @@ export interface FileRoutesById {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
-  '/app/inbox': typeof AppInboxRoute
+  '/app/inbox': typeof AppInboxRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -240,6 +248,7 @@ export interface FileRoutesById {
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
+    | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
+    | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
+    | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
@@ -488,6 +500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/inbox/$conversationId': {
+      id: '/app/inbox/$conversationId'
+      path: '/$conversationId'
+      fullPath: '/app/inbox/$conversationId'
+      preLoaderRoute: typeof AppInboxConversationIdRouteImport
+      parentRoute: typeof AppInboxRoute
+    }
     '/api/public/run-reminders': {
       id: '/api/public/run-reminders'
       path: '/api/public/run-reminders'
@@ -519,13 +538,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppInboxRouteChildren {
+  AppInboxConversationIdRoute: typeof AppInboxConversationIdRoute
+}
+
+const AppInboxRouteChildren: AppInboxRouteChildren = {
+  AppInboxConversationIdRoute: AppInboxConversationIdRoute,
+}
+
+const AppInboxRouteWithChildren = AppInboxRoute._addFileChildren(
+  AppInboxRouteChildren,
+)
+
 interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAutomationsRoute: typeof AppAutomationsRoute
   AppBroadcastsRoute: typeof AppBroadcastsRoute
   AppContactsRoute: typeof AppContactsRoute
   AppConversationsRoute: typeof AppConversationsRoute
-  AppInboxRoute: typeof AppInboxRoute
+  AppInboxRoute: typeof AppInboxRouteWithChildren
   AppInsightsRoute: typeof AppInsightsRoute
   AppLogsRoute: typeof AppLogsRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
@@ -545,7 +576,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBroadcastsRoute: AppBroadcastsRoute,
   AppContactsRoute: AppContactsRoute,
   AppConversationsRoute: AppConversationsRoute,
-  AppInboxRoute: AppInboxRoute,
+  AppInboxRoute: AppInboxRouteWithChildren,
   AppInsightsRoute: AppInsightsRoute,
   AppLogsRoute: AppLogsRoute,
   AppOnboardingRoute: AppOnboardingRoute,
