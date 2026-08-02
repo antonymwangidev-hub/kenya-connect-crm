@@ -265,6 +265,50 @@ export type Database = {
         }
         Relationships: []
       }
+      business_members: {
+        Row: {
+          business_id: string
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["member_role"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          display_name?: string | null
+          email: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_members_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_verifications: {
         Row: {
           business_id: string
@@ -453,6 +497,39 @@ export type Database = {
           },
         ]
       }
+      conversation_labels: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          tag_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          tag_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_labels_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_labels_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_notes: {
         Row: {
           author_id: string
@@ -482,6 +559,8 @@ export type Database = {
       }
       conversations: {
         Row: {
+          assigned_at: string | null
+          assigned_by: string | null
           assigned_to: string | null
           business_id: string
           contact_id: string
@@ -491,10 +570,13 @@ export type Database = {
           last_inbound_at: string | null
           last_message_at: string
           last_message_preview: string | null
+          status: string
           team: string | null
           unread_count: number
         }
         Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
           assigned_to?: string | null
           business_id: string
           contact_id: string
@@ -504,10 +586,13 @@ export type Database = {
           last_inbound_at?: string | null
           last_message_at?: string
           last_message_preview?: string | null
+          status?: string
           team?: string | null
           unread_count?: number
         }
         Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
           assigned_to?: string | null
           business_id?: string
           contact_id?: string
@@ -517,6 +602,7 @@ export type Database = {
           last_inbound_at?: string | null
           last_message_at?: string
           last_message_preview?: string | null
+          status?: string
           team?: string | null
           unread_count?: number
         }
@@ -526,6 +612,56 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: true
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbox_settings: {
+        Row: {
+          broadcast_rate_per_sec: number
+          business_id: string
+          close_hour: number
+          created_at: string
+          mpesa_autotag_enabled: boolean
+          open_days: number[]
+          open_hour: number
+          out_of_hours_enabled: boolean
+          out_of_hours_message: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          broadcast_rate_per_sec?: number
+          business_id: string
+          close_hour?: number
+          created_at?: string
+          mpesa_autotag_enabled?: boolean
+          open_days?: number[]
+          open_hour?: number
+          out_of_hours_enabled?: boolean
+          out_of_hours_message?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          broadcast_rate_per_sec?: number
+          business_id?: string
+          close_hour?: number
+          created_at?: string
+          mpesa_autotag_enabled?: boolean
+          open_days?: number[]
+          open_hour?: number
+          out_of_hours_enabled?: boolean
+          out_of_hours_message?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_settings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]
@@ -1143,6 +1279,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_write_business: { Args: { _business_id: string }; Returns: boolean }
+      can_write_contact: { Args: { _contact_id: string }; Returns: boolean }
+      can_write_conversation: {
+        Args: { _conversation_id: string }
+        Returns: boolean
+      }
+      claim_membership: { Args: never; Returns: undefined }
+      is_business_member: { Args: { _business_id: string }; Returns: boolean }
+      member_of_contact: { Args: { _contact_id: string }; Returns: boolean }
+      member_of_conversation: {
+        Args: { _conversation_id: string }
+        Returns: boolean
+      }
+      my_business_role: { Args: { _business_id: string }; Returns: string }
       owns_business: { Args: { _business_id: string }; Returns: boolean }
       owns_contact: { Args: { _contact_id: string }; Returns: boolean }
       rate_limit_check: {
@@ -1170,6 +1320,7 @@ export type Database = {
         | "first_message"
         | "reminder_due"
       contact_stage: "new" | "interested" | "negotiation" | "paid" | "lost"
+      member_role: "admin" | "agent" | "viewer"
       message_channel: "manual" | "whatsapp" | "sms"
       message_direction: "inbound" | "outbound"
     }
@@ -1315,6 +1466,7 @@ export const Constants = {
         "reminder_due",
       ],
       contact_stage: ["new", "interested", "negotiation", "paid", "lost"],
+      member_role: ["admin", "agent", "viewer"],
       message_channel: ["manual", "whatsapp", "sms"],
       message_direction: ["inbound", "outbound"],
     },

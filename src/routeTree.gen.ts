@@ -24,11 +24,13 @@ import { Route as AppPerformanceRouteImport } from './routes/app.performance'
 import { Route as AppOnboardingRouteImport } from './routes/app.onboarding'
 import { Route as AppLogsRouteImport } from './routes/app.logs'
 import { Route as AppInsightsRouteImport } from './routes/app.insights'
+import { Route as AppInboxRouteImport } from './routes/app.inbox'
 import { Route as AppConversationsRouteImport } from './routes/app.conversations'
 import { Route as AppContactsRouteImport } from './routes/app.contacts'
 import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
 import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
+import { Route as AppInboxConversationIdRouteImport } from './routes/app.inbox.$conversationId'
 import { Route as ApiPublicRunRemindersRouteImport } from './routes/api/public/run-reminders'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 import { Route as ApiPublicMpesaWebhookRouteImport } from './routes/api/public/mpesa.webhook'
@@ -109,6 +111,11 @@ const AppInsightsRoute = AppInsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInboxRoute = AppInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConversationsRoute = AppConversationsRouteImport.update({
   id: '/conversations',
   path: '/conversations',
@@ -133,6 +140,11 @@ const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
   getParentRoute: () => AppRoute,
+} as any)
+const AppInboxConversationIdRoute = AppInboxConversationIdRouteImport.update({
+  id: '/$conversationId',
+  path: '/$conversationId',
+  getParentRoute: () => AppInboxRoute,
 } as any)
 const ApiPublicRunRemindersRoute = ApiPublicRunRemindersRouteImport.update({
   id: '/api/public/run-reminders',
@@ -165,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/inbox': typeof AppInboxRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -178,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -191,6 +205,7 @@ export interface FileRoutesByTo {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/inbox': typeof AppInboxRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -204,6 +219,7 @@ export interface FileRoutesByTo {
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -218,6 +234,7 @@ export interface FileRoutesById {
   '/app/broadcasts': typeof AppBroadcastsRoute
   '/app/contacts': typeof AppContactsRoute
   '/app/conversations': typeof AppConversationsRoute
+  '/app/inbox': typeof AppInboxRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/logs': typeof AppLogsRoute
   '/app/onboarding': typeof AppOnboardingRoute
@@ -231,6 +248,7 @@ export interface FileRoutesById {
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
+  '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -246,6 +264,7 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/inbox'
     | '/app/insights'
     | '/app/logs'
     | '/app/onboarding'
@@ -259,6 +278,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
+    | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
@@ -272,6 +292,7 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/inbox'
     | '/app/insights'
     | '/app/logs'
     | '/app/onboarding'
@@ -285,6 +306,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
+    | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
@@ -298,6 +320,7 @@ export interface FileRouteTypes {
     | '/app/broadcasts'
     | '/app/contacts'
     | '/app/conversations'
+    | '/app/inbox'
     | '/app/insights'
     | '/app/logs'
     | '/app/onboarding'
@@ -311,6 +334,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
     | '/api/public/run-reminders'
+    | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
@@ -434,6 +458,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInsightsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/inbox': {
+      id: '/app/inbox'
+      path: '/inbox'
+      fullPath: '/app/inbox'
+      preLoaderRoute: typeof AppInboxRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/conversations': {
       id: '/app/conversations'
       path: '/conversations'
@@ -469,6 +500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/inbox/$conversationId': {
+      id: '/app/inbox/$conversationId'
+      path: '/$conversationId'
+      fullPath: '/app/inbox/$conversationId'
+      preLoaderRoute: typeof AppInboxConversationIdRouteImport
+      parentRoute: typeof AppInboxRoute
+    }
     '/api/public/run-reminders': {
       id: '/api/public/run-reminders'
       path: '/api/public/run-reminders'
@@ -500,12 +538,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppInboxRouteChildren {
+  AppInboxConversationIdRoute: typeof AppInboxConversationIdRoute
+}
+
+const AppInboxRouteChildren: AppInboxRouteChildren = {
+  AppInboxConversationIdRoute: AppInboxConversationIdRoute,
+}
+
+const AppInboxRouteWithChildren = AppInboxRoute._addFileChildren(
+  AppInboxRouteChildren,
+)
+
 interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAutomationsRoute: typeof AppAutomationsRoute
   AppBroadcastsRoute: typeof AppBroadcastsRoute
   AppContactsRoute: typeof AppContactsRoute
   AppConversationsRoute: typeof AppConversationsRoute
+  AppInboxRoute: typeof AppInboxRouteWithChildren
   AppInsightsRoute: typeof AppInsightsRoute
   AppLogsRoute: typeof AppLogsRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
@@ -525,6 +576,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBroadcastsRoute: AppBroadcastsRoute,
   AppContactsRoute: AppContactsRoute,
   AppConversationsRoute: AppConversationsRoute,
+  AppInboxRoute: AppInboxRouteWithChildren,
   AppInsightsRoute: AppInsightsRoute,
   AppLogsRoute: AppLogsRoute,
   AppOnboardingRoute: AppOnboardingRoute,
