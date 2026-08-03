@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { ChatWindow } from "@/components/inbox/ChatWindow";
 import { useAuth } from "@/lib/auth-context";
-import { useInbox } from "./app.inbox";
+import { useInbox } from "@/components/inbox/inbox-context";
 
 export const Route = createFileRoute("/app/inbox/$conversationId")({
   component: InboxConversationRoute,
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/app/inbox/$conversationId")({
 function InboxConversationRoute() {
   const { conversationId } = useParams({ from: "/app/inbox/$conversationId" });
   const { conversations, members, patchConversation } = useInbox();
-  const { user, canWrite } = useAuth();
+  const { user, canWrite, role, isOwner } = useAuth();
   const navigate = useNavigate();
 
   const conversation = conversations.find((c) => c.id === conversationId);
@@ -24,8 +24,11 @@ function InboxConversationRoute() {
       members={members}
       userId={user?.id ?? null}
       canWrite={canWrite}
+      role={role}
+      canAssignOthers={isOwner || role === "admin"}
       onBack={() => navigate({ to: "/app/inbox" })}
       onConversationChanged={(patch) => patchConversation(conversation.id, patch)}
     />
   );
 }
+

@@ -38,14 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .limit(1)
       .maybeSingle();
 
-    if (owned) {
-      setBusiness(owned as Business);
-      setRole("admin");
-      setIsOwner(true);
-      return;
-    }
-
-    // 2) Otherwise, a business the user is a team member of (shared inbox).
+    // 2) A business the user was invited into (shared inbox).
     await supabase.rpc("claim_membership").then(() => {}, () => {});
     const { data: membership } = await supabase
       .from("business_members")
@@ -54,6 +47,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
+
+    // Every signup gets an empty placeholder business. If the user was invited
+    // to a real workspace and never set up their own, work inside the team's.
+    const preferMembership = Boolean(membership?.business) && (!owned || !owned.onboarded_at);
+
+    if (owned && !preferMembership) {
+      setBusiness(owned as Business);
+      setRole("admin");
+      setIsOwner(true);
+      return;
+    }
 
     if (membership?.business) {
       setBusiness(membership.business as unknown as Business);
@@ -66,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(null);
     setIsOwner(false);
   };
+
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {

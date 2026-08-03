@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { InboxSidebar, type InboxFilter } from "@/components/inbox/InboxSidebar";
+import { InboxContext } from "@/components/inbox/inbox-context";
 import type { InboxConversation, TeamMember } from "@/components/inbox/inbox-types";
 
 export const Route = createFileRoute("/app/inbox")({
@@ -17,22 +18,8 @@ export const Route = createFileRoute("/app/inbox")({
   component: InboxLayout,
 });
 
-type InboxCtx = {
-  conversations: InboxConversation[];
-  members: TeamMember[];
-  patchConversation: (id: string, patch: Partial<InboxConversation>) => void;
-  reload: () => void;
-};
-
-const Ctx = createContext<InboxCtx | null>(null);
-export function useInbox() {
-  const v = useContext(Ctx);
-  if (!v) throw new Error("useInbox must be used inside the inbox layout");
-  return v;
-}
-
 function InboxLayout() {
-  const { businessId, user, canWrite } = useAuth();
+  const { businessId, user, canWrite, role } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const activeId = pathname.startsWith("/app/inbox/") ? pathname.split("/app/inbox/")[1] || null : null;
@@ -42,6 +29,7 @@ function InboxLayout() {
   const [labels, setLabels] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<InboxFilter>("open");
+
 
   const load = useCallback(async () => {
     if (!businessId) return;
@@ -101,7 +89,7 @@ function InboxLayout() {
   if (!businessId) return null;
 
   return (
-    <Ctx.Provider value={{ conversations, members, patchConversation, reload: load }}>
+    <InboxContext.Provider value={{ conversations, members, patchConversation, reload: load }}>
       <div className="flex h-[calc(100vh-3.5rem)] min-h-0 w-full md:h-screen">
         <div className={`w-full shrink-0 border-r lg:block lg:w-80 xl:w-96 ${activeId ? "hidden" : "block"}`}>
           <InboxSidebar
@@ -113,8 +101,10 @@ function InboxLayout() {
             filter={filter}
             onFilterChange={setFilter}
             labelsByConversation={labels}
+            role={role}
           />
         </div>
+
         <div className={`relative min-w-0 flex-1 ${activeId ? "block" : "hidden lg:block"}`}>
           {activeId ? (
             <Outlet />
@@ -125,6 +115,6 @@ function InboxLayout() {
           )}
         </div>
       </div>
-    </Ctx.Provider>
+    </InboxContext.Provider>
   );
 }

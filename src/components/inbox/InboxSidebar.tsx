@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Search, MessageCircle, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ export function InboxSidebar({
   filter,
   onFilterChange,
   labelsByConversation,
+  role,
 }: {
   conversations: InboxConversation[];
   loading: boolean;
@@ -36,8 +37,20 @@ export function InboxSidebar({
   filter: InboxFilter;
   onFilterChange: (f: InboxFilter) => void;
   labelsByConversation: Record<string, string[]>;
+  role?: "admin" | "agent" | "viewer" | null;
 }) {
   const [search, setSearch] = useState("");
+
+  // Viewers cannot own or claim conversations, so assignment-based views are
+  // hidden for them.
+  const visibleFilters = useMemo(
+    () => (role === "viewer" ? FILTERS.filter((f) => f.value !== "mine" && f.value !== "unassigned") : FILTERS),
+    [role],
+  );
+
+  useEffect(() => {
+    if (!visibleFilters.some((f) => f.value === filter)) onFilterChange("open");
+  }, [visibleFilters, filter, onFilterChange]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: conversations.length, mine: 0, unassigned: 0, open: 0, pending: 0, resolved: 0, spam: 0 };
@@ -48,6 +61,7 @@ export function InboxSidebar({
     }
     return c;
   }, [conversations, userId]);
+
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -92,7 +106,7 @@ export function InboxSidebar({
 
       <div className="flex gap-1 overflow-x-auto border-b px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <Filter className="mt-1 hidden h-3.5 w-3.5 shrink-0 text-muted-foreground sm:block" />
-        {FILTERS.map((f) => (
+        {visibleFilters.map((f) => (
           <button
             key={f.value}
             type="button"
