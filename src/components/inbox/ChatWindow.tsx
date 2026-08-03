@@ -401,9 +401,12 @@ export function ChatWindow({
           <div className="border-t bg-card p-2.5">
             <div className={`mb-1.5 flex items-center justify-between gap-2 text-[11px] ${window24.open ? "text-muted-foreground" : "text-destructive"}`}>
               <span className="truncate">{window24.label}</span>
-              <button type="button" onClick={() => setTemplateOpen(true)} className="inline-flex shrink-0 items-center gap-1 text-primary hover:underline">
-                <FileText className="h-3 w-3" /> Template
-              </button>
+              {canWrite && (
+                <button type="button" onClick={() => setTemplateOpen(true)} className="inline-flex shrink-0 items-center gap-1 text-primary hover:underline">
+                  <FileText className="h-3 w-3" /> Template
+                </button>
+              )}
+
             </div>
 
             {file && (
