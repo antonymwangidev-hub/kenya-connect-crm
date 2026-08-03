@@ -33,6 +33,8 @@ export function ChatWindow({
   members,
   userId,
   canWrite,
+  role,
+  canAssignOthers = false,
   onBack,
   onConversationChanged,
 }: {
@@ -40,9 +42,12 @@ export function ChatWindow({
   members: TeamMember[];
   userId: string | null;
   canWrite: boolean;
+  role?: "admin" | "agent" | "viewer" | null;
+  canAssignOthers?: boolean;
   onBack: () => void;
   onConversationChanged: (patch: Partial<InboxConversation>) => void;
 }) {
+
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
@@ -147,7 +152,8 @@ export function ChatWindow({
 
   // ---- actions ----------------------------------------------------------
   const claim = async () => {
-    if (!userId) return;
+    if (!userId || !canWrite) return;
+
     const { data, error } = await supabase
       .from("conversations")
       .update({ assigned_to: userId, assigned_at: new Date().toISOString() })
@@ -166,7 +172,15 @@ export function ChatWindow({
   };
 
   const assignTo = async (value: string) => {
+    if (!canWrite) return;
     const next = value === "unassigned" ? null : value;
+    // Agents may only claim or release conversations for themselves.
+    if (!canAssignOthers && next && next !== userId) {
+      return toast.error("Only admins can assign conversations to other teammates");
+    }
+    if (!canAssignOthers && !next && conversation.assigned_to && conversation.assigned_to !== userId) {
+      return toast.error("Only admins can unassign another teammate");
+    }
     const { error } = await supabase
       .from("conversations")
       .update({ assigned_to: next, assigned_at: next ? new Date().toISOString() : null })
@@ -176,11 +190,13 @@ export function ChatWindow({
   };
 
   const setStatus = async (value: ConversationStatus) => {
+    if (!canWrite) return;
     const { error } = await supabase.from("conversations").update({ status: value }).eq("id", conversation.id);
     if (error) return toast.error(error.message);
     onConversationChanged({ status: value });
     toast.success(`Marked ${value}`);
   };
+
 
   const doSend = async () => {
     if (!canWrite) return;
@@ -295,18 +311,31 @@ export function ChatWindow({
               ))}
             </SelectContent>
           </Select>
-          <Select value={conversation.assigned_to ?? "unassigned"} onValueChange={assignTo} disabled={!canWrite}>
+          <Select
+            value={conversation.assigned_to ?? "unassigned"}
+            onValueChange={assignTo}
+            disabled={!canWrite || (!canAssignOthers && !!conversation.assigned_to && conversation.assigned_to !== userId)}
+          >
             <SelectTrigger className="h-7 w-[140px] text-xs">
               <SelectValue placeholder="Assign" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="unassigned" className="text-xs">Unassigned</SelectItem>
-              {members.filter((m) => m.user_id).map((m) => (
-                <SelectItem key={m.id} value={m.user_id!} className="text-xs">{memberLabel(m)}</SelectItem>
-              ))}
+              {members
+                .filter((m) => m.user_id && (canAssignOthers || m.user_id === userId))
+                .map((m) => (
+                  <SelectItem key={m.id} value={m.user_id!} className="text-xs">{memberLabel(m)}</SelectItem>
+                ))}
+              {!canAssignOthers && userId && !members.some((m) => m.user_id === userId) && (
+                <SelectItem value={userId} className="text-xs">Me</SelectItem>
+              )}
             </SelectContent>
           </Select>
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${status.chip}`}>{status.label}</span>
+          {role === "viewer" && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">View only</span>
+          )}
+
           <LabelPicker businessId={conversation.business_id} conversationId={conversation.id} canWrite={canWrite} compact />
         </div>
       </header>
