@@ -81,29 +81,13 @@ function PerformancePage() {
     load();
   };
 
-  const total = contacts.length;
-  const paid = contacts.filter((c) => c.stage === "paid").length;
+  const total = metrics.contacts_total;
+  const paid = metrics.contacts_paid;
   const conversion = total ? Math.round((paid / total) * 100) : 0;
-
-  // Average response time: time between an inbound and the next outbound from same contact
-  let totalMs = 0, pairs = 0;
-  const byContact = new Map<string, typeof messages>();
-  for (const m of messages) {
-    const arr = byContact.get(m.contact_id) ?? [];
-    arr.push(m);
-    byContact.set(m.contact_id, arr);
-  }
-  for (const [, arr] of byContact) {
-    arr.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    for (let i = 0; i < arr.length - 1; i++) {
-      if (arr[i].direction === "inbound" && arr[i + 1].direction === "outbound") {
-        totalMs += new Date(arr[i + 1].created_at).getTime() - new Date(arr[i].created_at).getTime();
-        pairs++;
-      }
-    }
-  }
-  const avgMin = pairs ? Math.round(totalMs / pairs / 60000) : 0;
-  const revenueTotal = revenues.reduce((s, r) => s + Number(r.amount), 0);
+  const pairs = metrics.response_pairs;
+  const avgMin = Math.round(metrics.avg_response_minutes);
+  const revenueTotal = metrics.revenue_total;
+  const revenueCount = metrics.revenue_entries_count;
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6">
