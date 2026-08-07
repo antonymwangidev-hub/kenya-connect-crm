@@ -144,11 +144,16 @@ export const segmentContacts = createServerFn({ method: "POST" })
       .eq("business_id", data.businessId)
       .limit(100);
 
-    const { data: msgs } = await supabase
-      .from("messages")
-      .select("contact_id,direction,created_at")
-      .order("created_at", { ascending: false })
-      .limit(1000);
+    const contactIds = (contacts ?? []).map((c) => c.id);
+    const { data: msgs } = contactIds.length
+      ? await supabase
+          .from("messages")
+          .select("contact_id,direction,created_at")
+          .in("contact_id", contactIds)
+          .order("created_at", { ascending: false })
+          .limit(1000)
+      : { data: [] as { contact_id: string; direction: string; created_at: string }[] };
+
 
     const stats = (contacts ?? []).map((c) => {
       const ms = (msgs ?? []).filter((m) => m.contact_id === c.id);
