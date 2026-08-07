@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { MessageCircle, Users, Tags, LogOut, Zap, Megaphone, BarChart3, KanbanSquare, Sparkles, TrendingUp, FileText, Bell, Settings as SettingsIcon, Smartphone, Activity } from "lucide-react";
+import { MessageCircle, Users, Tags, LogOut, Zap, Megaphone, BarChart3, KanbanSquare, Sparkles, TrendingUp, FileText, Bell, Settings as SettingsIcon, Smartphone, Activity, Flame } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/app")({
@@ -11,6 +11,7 @@ const nav = [
   { to: "/app/inbox", label: "Inbox", icon: MessageCircle },
   { to: "/app/conversations", label: "Chats", icon: MessageCircle },
   { to: "/app/contacts", label: "Contacts", icon: Users },
+  { to: "/app/leads", label: "Lead scores", icon: Flame },
   { to: "/app/pipeline", label: "Pipeline", icon: KanbanSquare },
   { to: "/app/templates", label: "Templates", icon: FileText },
   { to: "/app/reminders", label: "Reminders", icon: Bell },
