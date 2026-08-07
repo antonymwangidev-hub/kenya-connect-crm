@@ -100,7 +100,7 @@ function PerformancePage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat icon={Target} label="Conversion" value={`${conversion}%`} sub={`${paid}/${total} paid`} />
           <Stat icon={Clock} label="Avg response" value={pairs ? `${avgMin}m` : "—"} sub={`${pairs} replies`} />
-          <Stat icon={DollarSign} label="Revenue" value={`KES ${revenueTotal.toLocaleString()}`} sub={`${revenues.length} entries`} />
+          <Stat icon={DollarSign} label="Revenue" value={`KES ${revenueTotal.toLocaleString()}`} sub={`${revenueCount} entries`} />
           <Stat icon={TrendingUp} label="Contacts" value={`${total}`} sub="total" />
         </div>
 
