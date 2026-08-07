@@ -12,30 +12,61 @@ export const Route = createFileRoute("/app/performance")({ component: Performanc
 
 type Revenue = { id: string; amount: number; currency: string; note: string | null; occurred_at: string };
 
+type Metrics = {
+  contacts_total: number;
+  contacts_paid: number;
+  avg_response_minutes: number;
+  response_pairs: number;
+  revenue_total: number;
+  revenue_entries_count: number;
+};
+
+const EMPTY_METRICS: Metrics = {
+  contacts_total: 0,
+  contacts_paid: 0,
+  avg_response_minutes: 0,
+  response_pairs: 0,
+  revenue_total: 0,
+  revenue_entries_count: 0,
+};
+
 function PerformancePage() {
   const { businessId } = useAuth();
-  const [contacts, setContacts] = useState<{ id: string; stage: string }[]>([]);
-  const [messages, setMessages] = useState<{ contact_id: string; direction: string; created_at: string }[]>([]);
+  const [metrics, setMetrics] = useState<Metrics>(EMPTY_METRICS);
   const [revenues, setRevenues] = useState<Revenue[]>([]);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!businessId) return;
-    const [{ data: c }, { data: r }] = await Promise.all([
-      supabase.from("contacts").select("id,stage").eq("business_id", businessId),
-      supabase.from("revenue_entries").select("*").eq("business_id", businessId).order("occurred_at", { ascending: false }),
+    // Metrics are aggregated in the database — no bulk message download.
+    const [{ data: m, error: mErr }, { data: r }] = await Promise.all([
+      supabase.rpc("business_performance_metrics", { _business_id: businessId }),
+      supabase
+        .from("revenue_entries")
+        .select("id,amount,currency,note,occurred_at")
+        .eq("business_id", businessId)
+        .order("occurred_at", { ascending: false })
+        .limit(10),
     ]);
-    setContacts(c ?? []);
+    if (mErr) toast.error(mErr.message);
+    const row = (m as Metrics[] | null)?.[0];
+    setMetrics(
+      row
+        ? {
+            contacts_total: Number(row.contacts_total),
+            contacts_paid: Number(row.contacts_paid),
+            avg_response_minutes: Number(row.avg_response_minutes),
+            response_pairs: Number(row.response_pairs),
+            revenue_total: Number(row.revenue_total),
+            revenue_entries_count: Number(row.revenue_entries_count),
+          }
+        : EMPTY_METRICS,
+    );
     setRevenues((r ?? []) as Revenue[]);
-    const ids = (c ?? []).map((x) => x.id);
-    if (ids.length) {
-      const { data: m } = await supabase.from("messages").select("contact_id,direction,created_at").in("contact_id", ids);
-      setMessages(m ?? []);
-    } else setMessages([]);
-  };
+  }, [businessId]);
 
-  useEffect(() => { load(); }, [businessId]);
+  useEffect(() => { load(); }, [load]);
 
   const addRevenue = async (e: React.FormEvent) => {
     e.preventDefault();
