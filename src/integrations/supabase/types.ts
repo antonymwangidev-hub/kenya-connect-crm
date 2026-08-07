@@ -460,6 +460,8 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          lead_score: number
+          lead_score_updated_at: string | null
           name: string
           notes: string | null
           phone: string
@@ -471,6 +473,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          lead_score?: number
+          lead_score_updated_at?: string | null
           name: string
           notes?: string | null
           phone: string
@@ -482,6 +486,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          lead_score?: number
+          lead_score_updated_at?: string | null
           name?: string
           notes?: string | null
           phone?: string
@@ -662,6 +668,54 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: true
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_score_history: {
+        Row: {
+          breakdown: Json
+          business_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          new_score: number
+          old_score: number
+          reason: string | null
+        }
+        Insert: {
+          breakdown?: Json
+          business_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          new_score?: number
+          old_score?: number
+          reason?: string | null
+        }
+        Update: {
+          breakdown?: Json
+          business_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          new_score?: number
+          old_score?: number
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_score_history_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_score_history_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -943,6 +997,53 @@ export type Database = {
           occurred_at?: string
         }
         Relationships: []
+      }
+      scoring_rules: {
+        Row: {
+          business_id: string
+          config: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          business_id: string
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          business_id?: string
+          config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scoring_rules_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sms_logs: {
         Row: {
@@ -1297,6 +1398,10 @@ export type Database = {
         Returns: boolean
       }
       claim_membership: { Args: never; Returns: undefined }
+      ensure_default_scoring_rules: {
+        Args: { _business_id: string }
+        Returns: undefined
+      }
       is_business_member: { Args: { _business_id: string }; Returns: boolean }
       member_of_contact: { Args: { _contact_id: string }; Returns: boolean }
       member_of_conversation: {
@@ -1314,6 +1419,15 @@ export type Database = {
           _window_seconds: number
         }
         Returns: boolean
+      }
+      recalc_all_lead_scores: { Args: never; Returns: number }
+      recalc_business_lead_scores: {
+        Args: { _business_id: string; _reason?: string }
+        Returns: number
+      }
+      recalc_lead_score: {
+        Args: { _contact_id: string; _reason?: string }
+        Returns: number
       }
     }
     Enums: {
