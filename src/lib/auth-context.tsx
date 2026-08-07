@@ -39,7 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     // 2) A business the user was invited into (shared inbox).
-    await supabase.rpc("claim_membership").then(() => {}, () => {});
+    const { error: claimError } = await supabase.rpc("claim_membership");
+    if (claimError) console.warn("claim_membership failed", claimError.message);
     const { data: membership } = await supabase
       .from("business_members")
       .select("role,business:businesses!inner(id,name,onboarded_at,logo_url)")
@@ -73,22 +74,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
+    let inFlightFor: string | null = null;
+
+    const loadOnce = async (uid: string) => {
+      if (inFlightFor === uid) return;
+      inFlightFor = uid;
+      try {
+        await loadBusiness(uid);
+      } finally {
+        inFlightFor = null;
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        setTimeout(() => loadBusiness(s.user.id), 0);
+        const uid = s.user.id;
+        setTimeout(() => { loadOnce(uid).finally(() => setLoading(false)); }, 0);
       } else {
         setBusiness(null);
         setRole(null);
         setIsOwner(false);
+        setLoading(false);
       }
     });
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) loadBusiness(s.user.id).finally(() => setLoading(false));
+      if (s?.user) loadOnce(s.user.id).finally(() => setLoading(false));
       else setLoading(false);
     });
 

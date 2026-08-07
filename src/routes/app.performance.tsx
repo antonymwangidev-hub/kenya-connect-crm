@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,30 +12,61 @@ export const Route = createFileRoute("/app/performance")({ component: Performanc
 
 type Revenue = { id: string; amount: number; currency: string; note: string | null; occurred_at: string };
 
+type Metrics = {
+  contacts_total: number;
+  contacts_paid: number;
+  avg_response_minutes: number;
+  response_pairs: number;
+  revenue_total: number;
+  revenue_entries_count: number;
+};
+
+const EMPTY_METRICS: Metrics = {
+  contacts_total: 0,
+  contacts_paid: 0,
+  avg_response_minutes: 0,
+  response_pairs: 0,
+  revenue_total: 0,
+  revenue_entries_count: 0,
+};
+
 function PerformancePage() {
   const { businessId } = useAuth();
-  const [contacts, setContacts] = useState<{ id: string; stage: string }[]>([]);
-  const [messages, setMessages] = useState<{ contact_id: string; direction: string; created_at: string }[]>([]);
+  const [metrics, setMetrics] = useState<Metrics>(EMPTY_METRICS);
   const [revenues, setRevenues] = useState<Revenue[]>([]);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!businessId) return;
-    const [{ data: c }, { data: r }] = await Promise.all([
-      supabase.from("contacts").select("id,stage").eq("business_id", businessId),
-      supabase.from("revenue_entries").select("*").eq("business_id", businessId).order("occurred_at", { ascending: false }),
+    // Metrics are aggregated in the database — no bulk message download.
+    const [{ data: m, error: mErr }, { data: r }] = await Promise.all([
+      supabase.rpc("business_performance_metrics", { _business_id: businessId }),
+      supabase
+        .from("revenue_entries")
+        .select("id,amount,currency,note,occurred_at")
+        .eq("business_id", businessId)
+        .order("occurred_at", { ascending: false })
+        .limit(10),
     ]);
-    setContacts(c ?? []);
+    if (mErr) toast.error(mErr.message);
+    const row = (m as Metrics[] | null)?.[0];
+    setMetrics(
+      row
+        ? {
+            contacts_total: Number(row.contacts_total),
+            contacts_paid: Number(row.contacts_paid),
+            avg_response_minutes: Number(row.avg_response_minutes),
+            response_pairs: Number(row.response_pairs),
+            revenue_total: Number(row.revenue_total),
+            revenue_entries_count: Number(row.revenue_entries_count),
+          }
+        : EMPTY_METRICS,
+    );
     setRevenues((r ?? []) as Revenue[]);
-    const ids = (c ?? []).map((x) => x.id);
-    if (ids.length) {
-      const { data: m } = await supabase.from("messages").select("contact_id,direction,created_at").in("contact_id", ids);
-      setMessages(m ?? []);
-    } else setMessages([]);
-  };
+  }, [businessId]);
 
-  useEffect(() => { load(); }, [businessId]);
+  useEffect(() => { load(); }, [load]);
 
   const addRevenue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,29 +81,13 @@ function PerformancePage() {
     load();
   };
 
-  const total = contacts.length;
-  const paid = contacts.filter((c) => c.stage === "paid").length;
+  const total = metrics.contacts_total;
+  const paid = metrics.contacts_paid;
   const conversion = total ? Math.round((paid / total) * 100) : 0;
-
-  // Average response time: time between an inbound and the next outbound from same contact
-  let totalMs = 0, pairs = 0;
-  const byContact = new Map<string, typeof messages>();
-  for (const m of messages) {
-    const arr = byContact.get(m.contact_id) ?? [];
-    arr.push(m);
-    byContact.set(m.contact_id, arr);
-  }
-  for (const [, arr] of byContact) {
-    arr.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    for (let i = 0; i < arr.length - 1; i++) {
-      if (arr[i].direction === "inbound" && arr[i + 1].direction === "outbound") {
-        totalMs += new Date(arr[i + 1].created_at).getTime() - new Date(arr[i].created_at).getTime();
-        pairs++;
-      }
-    }
-  }
-  const avgMin = pairs ? Math.round(totalMs / pairs / 60000) : 0;
-  const revenueTotal = revenues.reduce((s, r) => s + Number(r.amount), 0);
+  const pairs = metrics.response_pairs;
+  const avgMin = Math.round(metrics.avg_response_minutes);
+  const revenueTotal = metrics.revenue_total;
+  const revenueCount = metrics.revenue_entries_count;
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6">
@@ -85,7 +100,7 @@ function PerformancePage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat icon={Target} label="Conversion" value={`${conversion}%`} sub={`${paid}/${total} paid`} />
           <Stat icon={Clock} label="Avg response" value={pairs ? `${avgMin}m` : "—"} sub={`${pairs} replies`} />
-          <Stat icon={DollarSign} label="Revenue" value={`KES ${revenueTotal.toLocaleString()}`} sub={`${revenues.length} entries`} />
+          <Stat icon={DollarSign} label="Revenue" value={`KES ${revenueTotal.toLocaleString()}`} sub={`${revenueCount} entries`} />
           <Stat icon={TrendingUp} label="Contacts" value={`${total}`} sub="total" />
         </div>
 
