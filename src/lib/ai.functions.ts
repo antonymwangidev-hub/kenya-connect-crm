@@ -83,11 +83,16 @@ export const generateInsights = createServerFn({ method: "POST" })
       .select("id,name,phone,stage,created_at")
       .eq("business_id", data.businessId);
 
-    const { data: recentMsgs } = await supabase
-      .from("messages")
-      .select("contact_id,direction,content,created_at")
-      .order("created_at", { ascending: false })
-      .limit(500);
+    const ids = (contacts ?? []).map((c) => c.id);
+    const { data: recentMsgs } = ids.length
+      ? await supabase
+          .from("messages")
+          .select("contact_id,direction,created_at")
+          .in("contact_id", ids)
+          .order("created_at", { ascending: false })
+          .limit(500)
+      : { data: [] as { contact_id: string; direction: string; created_at: string }[] };
+
 
     const now = Date.now();
     const byContact = new Map<string, { last: number; inbound: number; outbound: number; lastInbound: number }>();
