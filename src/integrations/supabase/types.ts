@@ -1279,6 +1279,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      business_performance_metrics: {
+        Args: { _business_id: string }
+        Returns: {
+          avg_response_minutes: number
+          contacts_paid: number
+          contacts_total: number
+          response_pairs: number
+          revenue_entries_count: number
+          revenue_total: number
+        }[]
+      }
       can_write_business: { Args: { _business_id: string }; Returns: boolean }
       can_write_contact: { Args: { _contact_id: string }; Returns: boolean }
       can_write_conversation: {
