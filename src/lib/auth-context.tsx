@@ -39,7 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     // 2) A business the user was invited into (shared inbox).
-    await supabase.rpc("claim_membership").then(() => {}, () => {});
+    const { error: claimError } = await supabase.rpc("claim_membership");
+    if (claimError) console.warn("claim_membership failed", claimError.message);
     const { data: membership } = await supabase
       .from("business_members")
       .select("role,business:businesses!inner(id,name,onboarded_at,logo_url)")
