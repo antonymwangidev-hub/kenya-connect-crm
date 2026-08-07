@@ -214,7 +214,7 @@ function LeadsPage() {
               const tier = scoreTier(Number(l.lead_score));
               return (
                 <div key={l.id} className="flex items-center gap-3 rounded-lg border bg-card p-3">
-                  <ContactAvatar name={l.name} url={l.avatar_url} />
+                  <ContactAvatar name={l.name} avatarUrl={l.avatar_url} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{l.name}</p>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
