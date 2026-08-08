@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.route_lead(uuid) FROM authenticated;
