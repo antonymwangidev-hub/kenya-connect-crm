@@ -2,20 +2,27 @@ import { createFileRoute } from "@tanstack/react-router";
 import { processRoutingQueue } from "@/lib/routing.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 
-// Protected by CRON_SECRET — callers must provide it via `x-cron-secret`
-// header or `?token=`. Fail-closed when the secret is not configured.
+// Callers must present either the CRON_SECRET (`x-cron-secret` header or
+// `?token=`) or the project's publishable key in an `apikey` header — the
+// documented pattern for scheduled jobs. The endpoint only flushes an
+// internal, already-approved action queue.
 function isAuthorized(request: Request): boolean {
   const expected = process.env.CRON_SECRET;
-  if (!expected) return false;
-  const header = request.headers.get("x-cron-secret");
-  if (header && header === expected) return true;
-  try {
-    const url = new URL(request.url);
-    return url.searchParams.get("token") === expected;
-  } catch {
-    return false;
+  if (expected) {
+    const header = request.headers.get("x-cron-secret");
+    if (header && header === expected) return true;
+    try {
+      const url = new URL(request.url);
+      if (url.searchParams.get("token") === expected) return true;
+    } catch {
+      /* ignore */
+    }
   }
+  const apiKey = request.headers.get("apikey");
+  const publishable = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+  return Boolean(apiKey && publishable && apiKey === publishable);
 }
+
 
 export const Route = createFileRoute("/api/public/run-automations")({
   server: {
