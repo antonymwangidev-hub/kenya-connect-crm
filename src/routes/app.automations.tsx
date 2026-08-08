@@ -242,6 +242,10 @@ function AutomationsPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
+        <div className="mb-6">
+          <RoutingRulesSection />
+        </div>
+
         <div className="mb-6 rounded-lg border bg-card p-4">
           <p className="mb-2 text-sm font-medium">Quick templates</p>
           <p className="mb-3 text-xs text-muted-foreground">Tap to pre-fill the rule builder, then customize.</p>
