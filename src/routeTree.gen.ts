@@ -33,6 +33,7 @@ import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
 import { Route as AppInboxConversationIdRouteImport } from './routes/app.inbox.$conversationId'
 import { Route as ApiPublicRunRemindersRouteImport } from './routes/api/public/run-reminders'
+import { Route as ApiPublicRunAutomationsRouteImport } from './routes/api/public/run-automations'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 import { Route as ApiPublicMpesaWebhookRouteImport } from './routes/api/public/mpesa.webhook'
 import { Route as ApiPublicAtWebhookRouteImport } from './routes/api/public/at.webhook'
@@ -157,6 +158,11 @@ const ApiPublicRunRemindersRoute = ApiPublicRunRemindersRouteImport.update({
   path: '/api/public/run-reminders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRunAutomationsRoute = ApiPublicRunAutomationsRouteImport.update({
+  id: '/api/public/run-automations',
+  path: '/api/public/run-automations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWhatsappWebhookRoute =
   ApiPublicWhatsappWebhookRouteImport.update({
     id: '/api/public/whatsapp/webhook',
@@ -197,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/app/whatsapp': typeof AppWhatsappRoute
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
+  '/api/public/run-automations': typeof ApiPublicRunAutomationsRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
@@ -226,6 +233,7 @@ export interface FileRoutesByTo {
   '/app/whatsapp': typeof AppWhatsappRoute
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
+  '/api/public/run-automations': typeof ApiPublicRunAutomationsRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
@@ -256,6 +264,7 @@ export interface FileRoutesById {
   '/app/whatsapp': typeof AppWhatsappRoute
   '/app/whatsapp-diagnostics': typeof AppWhatsappDiagnosticsRoute
   '/whatsapp/callback': typeof WhatsappCallbackRoute
+  '/api/public/run-automations': typeof ApiPublicRunAutomationsRoute
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
@@ -287,6 +296,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp'
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
+    | '/api/public/run-automations'
     | '/api/public/run-reminders'
     | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp'
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
+    | '/api/public/run-automations'
     | '/api/public/run-reminders'
     | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/app/whatsapp'
     | '/app/whatsapp-diagnostics'
     | '/whatsapp/callback'
+    | '/api/public/run-automations'
     | '/api/public/run-reminders'
     | '/app/inbox/$conversationId'
     | '/api/public/at/webhook'
@@ -357,6 +369,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
   WhatsappCallbackRoute: typeof WhatsappCallbackRoute
+  ApiPublicRunAutomationsRoute: typeof ApiPublicRunAutomationsRoute
   ApiPublicRunRemindersRoute: typeof ApiPublicRunRemindersRoute
   ApiPublicAtWebhookRoute: typeof ApiPublicAtWebhookRoute
   ApiPublicMpesaWebhookRoute: typeof ApiPublicMpesaWebhookRoute
@@ -533,6 +546,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRunRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/run-automations': {
+      id: '/api/public/run-automations'
+      path: '/api/public/run-automations'
+      fullPath: '/api/public/run-automations'
+      preLoaderRoute: typeof ApiPublicRunAutomationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/whatsapp/webhook': {
       id: '/api/public/whatsapp/webhook'
       path: '/api/public/whatsapp/webhook'
@@ -618,6 +638,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
   WhatsappCallbackRoute: WhatsappCallbackRoute,
+  ApiPublicRunAutomationsRoute: ApiPublicRunAutomationsRoute,
   ApiPublicRunRemindersRoute: ApiPublicRunRemindersRoute,
   ApiPublicAtWebhookRoute: ApiPublicAtWebhookRoute,
   ApiPublicMpesaWebhookRoute: ApiPublicMpesaWebhookRoute,

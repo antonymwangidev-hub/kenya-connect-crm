@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, History, Loader2, RefreshCw, Search, Sliders, Phone } from "lucide-react";
+import { Flame, History, Loader2, RefreshCw, Search, Sliders, Phone, Route as RouteIcon, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContactAvatar } from "@/components/ContactAvatar";
 import { breakdownEntries, formatDelta, scoreTier, tierClasses, TIER_LABEL } from "@/lib/lead-score";
+import { useServerFn } from "@tanstack/react-start";
+import { runRoutingNow } from "@/lib/routing.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/leads")({
@@ -46,6 +48,15 @@ type Rule = {
   is_active: boolean;
 };
 
+type AssignmentRow = {
+  id: string;
+  assignee_id: string | null;
+  reason: string | null;
+  score: number | null;
+  dry_run: boolean;
+  created_at: string;
+};
+
 type HistoryRow = {
   id: string;
   old_score: number;
@@ -67,12 +78,18 @@ function LeadsPage() {
   const [showRules, setShowRules] = useState(false);
   const [historyFor, setHistoryFor] = useState<Lead | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
+  const [assignedBy, setAssignedBy] = useState<Record<string, string | null>>({});
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+  const [routing, setRouting] = useState(false);
+  const runRouting = useServerFn(runRoutingNow);
 
   const load = async () => {
     if (!businessId) return;
     setLoading(true);
     await supabase.rpc("ensure_default_scoring_rules", { _business_id: businessId });
-    const [{ data: cdata, error: cerr }, { data: rdata }] = await Promise.all([
+    const [{ data: cdata, error: cerr }, { data: rdata }, { data: convs }, { data: mems }] = await Promise.all([
       supabase
         .from("contacts")
         .select("id,name,phone,stage,avatar_url,lead_score,lead_score_updated_at")
@@ -83,10 +100,27 @@ function LeadsPage() {
         .select("id,key,name,description,weight,is_active")
         .eq("business_id", businessId)
         .order("key"),
+      supabase.from("conversations").select("contact_id,assigned_to").eq("business_id", businessId),
+      supabase
+        .from("business_members")
+        .select("user_id,email,display_name")
+        .eq("business_id", businessId),
     ]);
     if (cerr) toast.error(cerr.message);
     setLeads((cdata as Lead[]) ?? []);
     setRules((rdata as Rule[]) ?? []);
+    setAssignedBy(
+      Object.fromEntries(
+        ((convs as { contact_id: string; assigned_to: string | null }[]) ?? []).map((c) => [c.contact_id, c.assigned_to]),
+      ),
+    );
+    setMemberNames(
+      Object.fromEntries(
+        ((mems as { user_id: string | null; email: string; display_name: string | null }[]) ?? [])
+          .filter((m) => m.user_id)
+          .map((m) => [m.user_id as string, m.display_name || m.email]),
+      ),
+    );
     setLoading(false);
   };
 
@@ -103,6 +137,20 @@ function LeadsPage() {
     if (error) { toast.error(error.message); return; }
     toast.success(`Rescored ${data ?? 0} leads`);
     load();
+  };
+
+  const doRouting = async () => {
+    if (!businessId) return;
+    setRouting(true);
+    try {
+      const res = await runRouting({ data: { businessId } });
+      toast.success(`Routed ${res.rescored} leads · ${res.sent} message(s) sent`);
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Routing failed");
+    } finally {
+      setRouting(false);
+    }
   };
 
   const recalcOne = async (id: string) => {
@@ -130,6 +178,14 @@ function LeadsPage() {
   const openHistory = async (lead: Lead) => {
     setHistoryFor(lead);
     setHistory([]);
+    setAssignments([]);
+    const { data: adata } = await supabase
+      .from("lead_assignments")
+      .select("id,assignee_id,reason,score,dry_run,created_at")
+      .eq("contact_id", lead.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    setAssignments((adata as AssignmentRow[]) ?? []);
     const { data, error } = await supabase
       .from("lead_score_history")
       .select("id,old_score,new_score,reason,breakdown,created_at")
@@ -144,9 +200,10 @@ function LeadsPage() {
     const q = search.trim().toLowerCase();
     return leads
       .filter((l) => Number(l.lead_score) >= minScore)
+      .filter((l) => !unassignedOnly || !assignedBy[l.id])
       .filter((l) => !q || l.name.toLowerCase().includes(q) || l.phone.includes(q))
       .sort((a, b) => (sortDesc ? b.lead_score - a.lead_score : a.lead_score - b.lead_score));
-  }, [leads, search, minScore, sortDesc]);
+  }, [leads, search, minScore, sortDesc, unassignedOnly, assignedBy]);
 
   const hot = leads.filter((l) => scoreTier(Number(l.lead_score)) === "hot").length;
 
@@ -187,10 +244,21 @@ function LeadsPage() {
           <Button variant="outline" size="sm" onClick={() => setSortDesc((s) => !s)}>
             Score {sortDesc ? "↓" : "↑"}
           </Button>
+          <Button
+            variant={unassignedOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setUnassignedOnly((v) => !v)}
+          >
+            Unassigned
+          </Button>
           {canWrite && (
             <>
               <Button variant="outline" size="sm" onClick={() => setShowRules(true)}>
                 <Sliders className="mr-1 h-4 w-4" /> Rules
+              </Button>
+              <Button variant="outline" size="sm" onClick={doRouting} disabled={routing}>
+                {routing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RouteIcon className="mr-1 h-4 w-4" />}
+                Run routing
               </Button>
               <Button size="sm" onClick={recalcAll} disabled={recalcing}>
                 {recalcing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
@@ -219,6 +287,10 @@ function LeadsPage() {
                     <p className="truncate text-sm font-medium">{l.name}</p>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Phone className="h-3 w-3" />{l.phone} · {l.stage}
+                    </p>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <UserCheck className="h-3 w-3" />
+                      {assignedBy[l.id] ? (memberNames[assignedBy[l.id] as string] ?? "assigned") : "Unassigned"}
                     </p>
                   </div>
                   <div className="text-right">
@@ -280,6 +352,23 @@ function LeadsPage() {
       <Dialog open={Boolean(historyFor)} onOpenChange={(o) => !o && setHistoryFor(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{historyFor?.name} — score history</DialogTitle></DialogHeader>
+          {assignments.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Assignment history</p>
+              {assignments.map((a) => (
+                <div key={a.id} className="rounded-md border p-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">
+                      {a.assignee_id ? (memberNames[a.assignee_id] ?? "teammate") : "unassigned"}
+                      {a.dry_run && <span className="ml-2 rounded bg-muted px-1.5 py-0.5">dry run</span>}
+                    </span>
+                    <span className="text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">{a.reason}</p>
+                </div>
+              ))}
+            </div>
+          )}
           {history.length === 0 ? (
             <p className="text-sm text-muted-foreground">No score changes recorded yet.</p>
           ) : (

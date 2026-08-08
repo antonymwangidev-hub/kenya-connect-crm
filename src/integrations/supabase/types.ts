@@ -672,6 +672,64 @@ export type Database = {
           },
         ]
       }
+      lead_assignments: {
+        Row: {
+          assignee_id: string | null
+          business_id: string
+          contact_id: string
+          created_at: string
+          dry_run: boolean
+          id: string
+          reason: string | null
+          rule_id: string | null
+          score: number | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          business_id: string
+          contact_id: string
+          created_at?: string
+          dry_run?: boolean
+          id?: string
+          reason?: string | null
+          rule_id?: string | null
+          score?: number | null
+        }
+        Update: {
+          assignee_id?: string | null
+          business_id?: string
+          contact_id?: string
+          created_at?: string
+          dry_run?: boolean
+          id?: string
+          reason?: string | null
+          rule_id?: string | null
+          score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_assignments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_assignments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_assignments_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "routing_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_score_history: {
         Row: {
           breakdown: Json
@@ -997,6 +1055,147 @@ export type Database = {
           occurred_at?: string
         }
         Relationships: []
+      }
+      routing_action_runs: {
+        Row: {
+          action: string
+          business_id: string
+          contact_id: string
+          created_at: string
+          dedupe_key: string
+          detail: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          rule_id: string | null
+          scheduled_at: string
+          status: string
+        }
+        Insert: {
+          action: string
+          business_id: string
+          contact_id: string
+          created_at?: string
+          dedupe_key: string
+          detail?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          rule_id?: string | null
+          scheduled_at?: string
+          status?: string
+        }
+        Update: {
+          action?: string
+          business_id?: string
+          contact_id?: string
+          created_at?: string
+          dedupe_key?: string
+          detail?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          rule_id?: string | null
+          scheduled_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routing_action_runs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routing_action_runs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routing_action_runs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "routing_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routing_rules: {
+        Row: {
+          assign_strategy: string
+          assign_to_user_id: string | null
+          business_id: string
+          create_task: boolean
+          created_at: string
+          dry_run: boolean
+          id: string
+          is_active: boolean
+          max_score: number
+          message_body: string | null
+          min_score: number
+          name: string
+          priority: number
+          send_message: boolean
+          stages: string[]
+          task_hours: number
+          task_note: string | null
+          team: string | null
+          updated_at: string
+        }
+        Insert: {
+          assign_strategy?: string
+          assign_to_user_id?: string | null
+          business_id: string
+          create_task?: boolean
+          created_at?: string
+          dry_run?: boolean
+          id?: string
+          is_active?: boolean
+          max_score?: number
+          message_body?: string | null
+          min_score?: number
+          name: string
+          priority?: number
+          send_message?: boolean
+          stages?: string[]
+          task_hours?: number
+          task_note?: string | null
+          team?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assign_strategy?: string
+          assign_to_user_id?: string | null
+          business_id?: string
+          create_task?: boolean
+          created_at?: string
+          dry_run?: boolean
+          id?: string
+          is_active?: boolean
+          max_score?: number
+          message_body?: string | null
+          min_score?: number
+          name?: string
+          priority?: number
+          send_message?: boolean
+          stages?: string[]
+          task_hours?: number
+          task_note?: string | null
+          team?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routing_rules_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scoring_rules: {
         Row: {
@@ -1429,6 +1628,7 @@ export type Database = {
         Args: { _contact_id: string; _reason?: string }
         Returns: number
       }
+      route_lead: { Args: { _contact_id: string }; Returns: string }
     }
     Enums: {
       automation_action:
