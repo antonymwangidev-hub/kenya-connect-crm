@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { RoutingRulesSection } from "@/components/RoutingRulesSection";
 
 export const Route = createFileRoute("/app/automations")({
   component: AutomationsPage,
