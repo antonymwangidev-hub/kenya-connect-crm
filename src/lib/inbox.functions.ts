@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { writeAudit } from "@/lib/audit.server";
 
 // ---------------------------------------------------------------------------
 // Team management for the shared inbox. Invites need a privileged lookup of
@@ -61,6 +62,15 @@ export const inviteTeamMember = createServerFn({ method: "POST" })
       .select("id,email,role,user_id,display_name,created_at")
       .single();
     if (error) throw new Error(error.message);
+
+    await writeAudit({
+      businessId: data.businessId,
+      actorId: userId,
+      action: "team.member_upserted",
+      targetType: "business_member",
+      targetId: row?.id ?? null,
+      detail: { email, role: data.role, linked: Boolean(linkedUserId) },
+    });
 
     return { member: row, linked: Boolean(linkedUserId) };
   });
