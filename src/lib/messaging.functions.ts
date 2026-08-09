@@ -177,6 +177,16 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
       .single();
     if (contactErr || !contact) throw new Error("Contact not found");
 
+    // Per-business and per-user send throttling (token bucket in Postgres).
+    const withinBusinessLimit = await checkRateLimit("send_message_business", contact.business_id, 600, 60);
+    if (!withinBusinessLimit) {
+      throw new Error("Sending too fast for this workspace. Please retry in a moment.");
+    }
+    const withinUserLimit = await checkRateLimit("send_message_user", context.userId, 120, 60);
+    if (!withinUserLimit) {
+      throw new Error("You are sending messages too quickly. Please slow down.");
+    }
+
     let mediaForSend: OutboundMedia | undefined;
     if (data.media) {
       // Sign a temporary URL Meta can fetch to download the file. We only
@@ -251,5 +261,15 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
       .select()
       .single();
     if (insErr) throw new Error(insErr.message);
+
+    await writeAudit({
+      businessId: contact.business_id,
+      actorId: context.userId,
+      action: "message.sent",
+      targetType: "contact",
+      targetId: contact.id,
+      detail: { channel, has_media: Boolean(data.media), length: data.content.length },
+    });
+
     return { message: inserted, channel };
   });
