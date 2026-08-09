@@ -393,5 +393,14 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       .single();
     if (insErr) throw new Error(insErr.message);
 
+    await writeAudit({
+      businessId: contact.business_id,
+      actorId: userId,
+      action: "template.sent",
+      targetType: "contact",
+      targetId: contact.id,
+      detail: { template: tpl.name, waba_id: account.waba_id, provider_message_id: providerId },
+    });
+
     return { message: inserted, providerMessageId: providerId };
   });
