@@ -90,15 +90,6 @@ export const startWhatsappConnection = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) throw new Error(error.message);
-    await writeAudit({
-      businessId: biz.id,
-      actorId: userId,
-      action: "whatsapp.connected",
-      targetType: "whatsapp_connection",
-      targetId: inserted.id,
-      detail: { waba_id: wabaId, phone_number_id: phoneNumberId, source: "embedded_signup" },
-    });
-
     return { connection: row };
   });
 
@@ -128,15 +119,6 @@ export const completeWhatsappConnection = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) throw new Error(error.message);
-    await writeAudit({
-      businessId: biz.id,
-      actorId: userId,
-      action: "whatsapp.connected",
-      targetType: "whatsapp_connection",
-      targetId: inserted.id,
-      detail: { waba_id: wabaId, phone_number_id: phoneNumberId, source: "embedded_signup" },
-    });
-
     return { connection: row };
   });
 
