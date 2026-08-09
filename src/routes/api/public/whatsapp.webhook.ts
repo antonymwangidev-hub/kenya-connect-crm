@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 import { maybeAutoReply } from "@/lib/ai-auto-reply.server";
+import { decryptSecret } from "@/lib/crypto.server";
 
 // Meta WhatsApp Cloud API webhook.
 // Public URL example: https://<project>.lovable.app/api/public/whatsapp/webhook
@@ -106,7 +107,8 @@ async function getBusinessWhatsappToken(businessId: string): Promise<string | nu
     .limit(1)
     .maybeSingle();
   const meta = (conn?.meta ?? {}) as Record<string, unknown>;
-  const fromConn = typeof meta.access_token === "string" ? meta.access_token : null;
+  const fromConn =
+    typeof meta.access_token === "string" ? await decryptSecret(meta.access_token) : null;
   if (fromConn) return fromConn;
   const { data: cred } = await supabaseAdmin
     .from("channel_credentials")
@@ -116,7 +118,7 @@ async function getBusinessWhatsappToken(businessId: string): Promise<string | nu
     .eq("is_active", true)
     .maybeSingle();
   const c = (cred?.credentials ?? {}) as Record<string, string>;
-  return c.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN ?? null;
+  return (await decryptSecret(c.access_token)) ?? process.env.WHATSAPP_ACCESS_TOKEN ?? null;
 }
 
 async function downloadWhatsappMedia(opts: {

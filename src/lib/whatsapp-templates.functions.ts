@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { decryptSecret } from "@/lib/crypto.server";
 
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
 
@@ -35,7 +36,9 @@ async function resolveWabaTokenForAccount(
     .limit(1)
     .maybeSingle();
 
-  const connToken = ((conn?.meta ?? {}) as Record<string, string>).access_token?.trim();
+  const connToken = (
+    await decryptSecret(((conn?.meta ?? {}) as Record<string, string>).access_token)
+  )?.trim();
   if (connToken) return { token: connToken, source: "whatsapp_connections.meta.access_token" as const };
 
   const { data: credsRow } = await supabase
@@ -45,7 +48,7 @@ async function resolveWabaTokenForAccount(
     .eq("provider", "whatsapp")
     .maybeSingle();
   const creds = ((credsRow?.credentials ?? {}) as Record<string, string>) || {};
-  const credsToken = credsRow?.is_active ? creds.access_token?.trim() : null;
+  const credsToken = credsRow?.is_active ? (await decryptSecret(creds.access_token))?.trim() ?? null : null;
   const credsPhoneNumberId = creds.phone_number_id?.trim();
   if (credsToken && (!credsPhoneNumberId || credsPhoneNumberId === account.phone_number_id)) {
     return { token: credsToken, source: "channel_credentials.access_token" as const };
@@ -54,7 +57,7 @@ async function resolveWabaTokenForAccount(
   const envToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim() || null;
   if (envToken) return { token: envToken, source: "env:WHATSAPP_ACCESS_TOKEN" as const };
 
-  const accountToken = account.access_token?.trim() || null;
+  const accountToken = (await decryptSecret(account.access_token))?.trim() || null;
   if (accountToken) return { token: accountToken, source: "whatsapp_business_accounts.access_token:legacy-fallback" as const };
 
   return { token: null, source: "none" as const };

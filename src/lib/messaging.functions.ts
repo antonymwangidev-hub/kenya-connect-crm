@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { decryptSecret } from "@/lib/crypto.server";
+import { checkRateLimit } from "@/lib/rate-limit.server";
+import { writeAudit } from "@/lib/audit.server";
 
 // Reads per-business creds from channel_credentials (set in onboarding/Settings).
 // Falls back to env vars for backwards compatibility.
@@ -31,7 +34,10 @@ async function resolveWhatsAppSendConfig(businessId: string) {
     .maybeSingle();
 
   const connMeta = (conn?.meta ?? {}) as Record<string, string>;
-  const token = connMeta.access_token ?? c?.access_token ?? process.env.WHATSAPP_ACCESS_TOKEN;
+  const token =
+    (await decryptSecret(connMeta.access_token)) ??
+    (await decryptSecret(c?.access_token)) ??
+    process.env.WHATSAPP_ACCESS_TOKEN;
   let phoneNumberId = conn?.phone_number_id ?? c?.phone_number_id ?? null;
 
   if (!phoneNumberId) {
@@ -106,7 +112,7 @@ export async function sendWhatsApp(
 
 export async function sendAfricasTalking(businessId: string, toPhone: string, content: string) {
   const c = await getCreds(businessId, "africastalking");
-  const apiKey = c?.api_key ?? process.env.AFRICASTALKING_API_KEY;
+  const apiKey = (await decryptSecret(c?.api_key)) ?? process.env.AFRICASTALKING_API_KEY;
   const username = c?.username ?? process.env.AFRICASTALKING_USERNAME;
   const senderId = c?.sender_id ?? process.env.AFRICASTALKING_SENDER_ID;
   if (!apiKey || !username) throw new Error("Africa's Talking not configured");

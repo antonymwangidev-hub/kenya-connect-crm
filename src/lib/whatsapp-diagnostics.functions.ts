@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { decryptSecret } from "@/lib/crypto.server";
 
 const GRAPH_VERSION = "v21.0";
 
@@ -25,7 +26,7 @@ async function resolveTokenForWaba(
       .select("access_token")
       .eq("waba_id", wabaId)
       .maybeSingle();
-    const t = acc?.access_token?.trim();
+    const t = (await decryptSecret(acc?.access_token))?.trim();
     if (t) return t;
   }
   if (phoneNumberId) {
@@ -36,7 +37,8 @@ async function resolveTokenForWaba(
       .neq("status", "disconnected")
       .maybeSingle();
     const meta = (conn?.meta ?? {}) as Record<string, string>;
-    if (meta.access_token) return meta.access_token;
+    const connTok = await decryptSecret(meta.access_token);
+    if (connTok) return connTok;
   }
   return process.env.WHATSAPP_ACCESS_TOKEN?.trim() ?? null;
 }

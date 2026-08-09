@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { decryptSecret, encryptFields, encryptSecret } from "@/lib/crypto.server";
+import { writeAudit } from "@/lib/audit.server";
 
 const providerSchema = z.enum(["whatsapp", "africastalking", "mpesa"]);
 
@@ -46,7 +48,8 @@ export const listChannelCredentials = createServerFn({ method: "GET" })
       .select("provider, is_active, credentials");
     if (error) throw new Error(error.message);
 
-    const creds: CredMeta[] = (data ?? []).map((row) => {
+    const creds: CredMeta[] = [];
+    for (const row of data ?? []) {
       const provider = row.provider as ProviderName;
       const raw = (row.credentials ?? {}) as Record<string, string>;
       const publicFields: Record<string, string> = {};
@@ -58,17 +61,17 @@ export const listChannelCredentials = createServerFn({ method: "GET" })
       for (const k of SECRET_FIELDS[provider] ?? []) {
         if (raw[k]) {
           hasSecrets = true;
-          secretHints[k] = maskTail(String(raw[k]));
+          secretHints[k] = maskTail((await decryptSecret(String(raw[k]))) ?? "");
         }
       }
-      return {
+      creds.push({
         provider,
         is_active: !!row.is_active,
         has_secrets: hasSecrets,
         public_fields: publicFields,
         secret_hints: secretHints,
-      };
-    });
+      });
+    }
     return { creds };
   });
 
@@ -122,13 +125,15 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
       if (typeof v === "string" && v.length > 0) merged[k] = v;
     }
 
+    const stored = await encryptFields(merged, SECRET_FIELDS[data.provider] ?? []);
+
     const { error } = await supabase
       .from("channel_credentials")
       .upsert(
         {
           business_id: biz.id,
           provider: data.provider,
-          credentials: merged,
+          credentials: stored,
           is_active: data.is_active ?? existing?.is_active ?? false,
         },
         { onConflict: "business_id,provider" },
@@ -150,7 +155,7 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
             waba_id: wabaId,
             phone_number_id: phoneNumberId,
             business_name: (bizRow?.name as string | undefined) ?? "WhatsApp Business",
-            access_token: accessToken || null,
+            access_token: accessToken ? await encryptSecret(accessToken) : null,
             status: data.is_active === false ? "disabled" : "connected",
             meta: { source: "manual_settings" } as never,
           },
@@ -158,5 +163,19 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
         );
       }
     }
+    await writeAudit({
+      businessId: biz.id,
+      actorId: context.userId,
+      action: "channel_credentials.updated",
+      targetType: "channel_credentials",
+      targetId: data.provider,
+      detail: {
+        provider: data.provider,
+        is_active: data.is_active ?? existing?.is_active ?? false,
+        secrets_changed: Object.keys(data.secret_fields ?? {}).filter(
+          (k) => (data.secret_fields?.[k] ?? "").length > 0,
+        ),
+      },
+    });
     return { ok: true };
   });
