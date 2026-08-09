@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { encryptSecret } from "@/lib/crypto.server";
+import { writeAudit } from "@/lib/audit.server";
 
 // Guided WhatsApp connection server fns.
 // These create/update rows in whatsapp_connections so the UI can drive a
@@ -234,6 +236,8 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
       .single();
     if (!biz) throw new Error("Business not found");
 
+    const encryptedToken = await encryptSecret(accessToken);
+
     const { data: inserted, error } = await supabase
       .from("whatsapp_connections")
       .insert({
@@ -247,7 +251,7 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
         connected_at: new Date().toISOString(),
         meta: {
           source: "embedded_signup",
-          access_token: accessToken,
+          access_token: encryptedToken,
           app_id: appId,
         },
       })
@@ -265,7 +269,7 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
             business_name: displayName ?? phoneNumber ?? "WhatsApp Account",
             waba_id: wabaId,
             phone_number_id: phoneNumberId,
-            access_token: accessToken,
+            access_token: encryptedToken,
             status: "connected",
             meta: { phone_number: phoneNumber, source: "embedded_signup" },
           },
@@ -279,6 +283,15 @@ export const exchangeWhatsappSignup = createServerFn({ method: "POST" })
       .select(SAFE_CONNECTION_COLUMNS)
       .eq("id", inserted.id)
       .single();
+    await writeAudit({
+      businessId: biz.id,
+      actorId: userId,
+      action: "whatsapp.connected",
+      targetType: "whatsapp_connection",
+      targetId: inserted.id,
+      detail: { waba_id: wabaId, phone_number_id: phoneNumberId, source: "embedded_signup" },
+    });
+
     return { connection: row };
   });
 

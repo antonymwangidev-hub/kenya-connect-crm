@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { listWebhookLogs, listSmsLogs, retrySmsDelivery } from "@/lib/logs.functions";
+import { listWebhookLogs, listSmsLogs, retrySmsDelivery, listAuditLog } from "@/lib/logs.functions";
 
 export const Route = createFileRoute("/app/logs")({ component: LogsPage });
 
@@ -22,9 +22,11 @@ function LogsPage() {
   const fetchHooks = useServerFn(listWebhookLogs);
   const fetchSms = useServerFn(listSmsLogs);
   const retry = useServerFn(retrySmsDelivery);
+  const fetchAudit = useServerFn(listAuditLog);
 
   const hooks = useQuery({ queryKey: ["webhook-logs"], queryFn: () => fetchHooks() });
   const sms = useQuery({ queryKey: ["sms-logs"], queryFn: () => fetchSms() });
+  const audit = useQuery({ queryKey: ["audit-log"], queryFn: () => fetchAudit() });
 
   const retryMut = useMutation({
     mutationFn: (smsLogId: string) => retry({ data: { smsLogId } }),
@@ -52,6 +54,7 @@ function LogsPage() {
           onClick={() => {
             hooks.refetch();
             sms.refetch();
+            audit.refetch();
           }}
         >
           <RefreshCw className="mr-2 h-4 w-4" /> Refresh
@@ -62,6 +65,7 @@ function LogsPage() {
         <TabsList>
           <TabsTrigger value="deliveries">Outbound deliveries</TabsTrigger>
           <TabsTrigger value="webhooks">Inbound webhooks</TabsTrigger>
+          <TabsTrigger value="audit">Audit trail</TabsTrigger>
         </TabsList>
 
         <TabsContent value="deliveries" className="mt-4">
@@ -191,6 +195,41 @@ function LogsPage() {
                 <pre className="mt-4 max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs">
                   {JSON.stringify(hooks.data.find((r) => r.id === openPayload)?.payload, null, 2)}
                 </pre>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="audit" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Audit trail</CardTitle>
+              <CardDescription>
+                Sensitive actions recorded for compliance: message sends, broadcasts, credential
+                changes and team updates. Entries cannot be edited or deleted.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {audit.isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : (audit.data?.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground">No audited actions yet.</p>
+              ) : (
+                <div className="divide-y">
+                  {audit.data!.map((row) => (
+                    <div key={row.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
+                      <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs">{row.action}</span>
+                      <span className="text-muted-foreground">{row.actor_email ?? row.actor_id ?? "system"}</span>
+                      {row.target_type && (
+                        <span className="text-muted-foreground">
+                          {row.target_type}
+                          {row.target_id ? ` · ${row.target_id.slice(0, 8)}` : ""}
+                        </span>
+                      )}
+                      <span className="ml-auto text-xs text-muted-foreground">{fmtTime(row.created_at)}</span>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

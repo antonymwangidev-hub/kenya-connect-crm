@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sendWhatsApp, sendAfricasTalking } from "@/lib/messaging.functions";
+import { checkRateLimit } from "@/lib/rate-limit.server";
+import { writeAudit } from "@/lib/audit.server";
 
 
 // ---- Broadcast: send the same message to many contacts, with a small delay between sends ----
@@ -28,6 +30,10 @@ export const sendBroadcast = createServerFn({ method: "POST" })
     if (!contacts || contacts.length === 0) throw new Error("No contacts found");
 
     const businessId = contacts[0].business_id;
+
+    // One broadcast burst per business per minute, capped by recipient volume.
+    const ok = await checkRateLimit("broadcast_business", businessId, 5, 60);
+    if (!ok) throw new Error("Too many broadcasts started recently. Please wait a minute.");
 
     const { data: broadcast, error: bErr } = await supabase
       .from("broadcasts")
@@ -85,6 +91,15 @@ export const sendBroadcast = createServerFn({ method: "POST" })
     }
 
 
+
+    await writeAudit({
+      businessId,
+      actorId: context.userId,
+      action: "broadcast.sent",
+      targetType: "broadcast",
+      targetId: broadcast.id,
+      detail: { name: data.name, recipients: contacts.length, sent, failed },
+    });
 
     await supabase
       .from("broadcasts")

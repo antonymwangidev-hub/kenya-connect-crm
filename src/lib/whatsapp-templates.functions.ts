@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { decryptSecret } from "@/lib/crypto.server";
+import { checkRateLimit } from "@/lib/rate-limit.server";
+import { writeAudit } from "@/lib/audit.server";
 
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
 
@@ -35,7 +38,9 @@ async function resolveWabaTokenForAccount(
     .limit(1)
     .maybeSingle();
 
-  const connToken = ((conn?.meta ?? {}) as Record<string, string>).access_token?.trim();
+  const connToken = (
+    await decryptSecret(((conn?.meta ?? {}) as Record<string, string>).access_token)
+  )?.trim();
   if (connToken) return { token: connToken, source: "whatsapp_connections.meta.access_token" as const };
 
   const { data: credsRow } = await supabase
@@ -45,7 +50,7 @@ async function resolveWabaTokenForAccount(
     .eq("provider", "whatsapp")
     .maybeSingle();
   const creds = ((credsRow?.credentials ?? {}) as Record<string, string>) || {};
-  const credsToken = credsRow?.is_active ? creds.access_token?.trim() : null;
+  const credsToken = credsRow?.is_active ? (await decryptSecret(creds.access_token))?.trim() ?? null : null;
   const credsPhoneNumberId = creds.phone_number_id?.trim();
   if (credsToken && (!credsPhoneNumberId || credsPhoneNumberId === account.phone_number_id)) {
     return { token: credsToken, source: "channel_credentials.access_token" as const };
@@ -54,7 +59,7 @@ async function resolveWabaTokenForAccount(
   const envToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim() || null;
   if (envToken) return { token: envToken, source: "env:WHATSAPP_ACCESS_TOKEN" as const };
 
-  const accountToken = account.access_token?.trim() || null;
+  const accountToken = (await decryptSecret(account.access_token))?.trim() || null;
   if (accountToken) return { token: accountToken, source: "whatsapp_business_accounts.access_token:legacy-fallback" as const };
 
   return { token: null, source: "none" as const };
@@ -272,6 +277,9 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       .from("contacts").select("id,phone,business_id").eq("id", data.contactId).single();
     if (cErr || !contact) throw new Error("Contact not found");
 
+    const withinLimit = await checkRateLimit("send_template_business", contact.business_id, 600, 60);
+    if (!withinLimit) throw new Error("Sending too fast for this workspace. Please retry shortly.");
+
     const { data: tpl, error: tErr } = await supabase
       .from("whatsapp_templates").select("*").eq("id", data.templateId).single();
     if (tErr || !tpl) throw new Error("Template not found");
@@ -384,6 +392,15 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
       .select()
       .single();
     if (insErr) throw new Error(insErr.message);
+
+    await writeAudit({
+      businessId: contact.business_id,
+      actorId: userId,
+      action: "template.sent",
+      targetType: "contact",
+      targetId: contact.id,
+      detail: { template: tpl.name, waba_id: account.waba_id, provider_message_id: providerId },
+    });
 
     return { message: inserted, providerMessageId: providerId };
   });

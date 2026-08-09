@@ -198,8 +198,11 @@ describe("Run-reminders cron", () => {
   });
 
   it("returns 429 when rate limited", async () => {
+    vi.stubEnv("CRON_SECRET", "topsecret");
     state.rateLimitAllow = false;
-    const res = await cron.POST!({ request: new Request(url, { method: "POST" }) });
+    const res = await cron.POST!({
+      request: new Request(`${url}?token=topsecret`, { method: "POST" }),
+    });
     expect(res.status).toBe(429);
   });
 
@@ -208,7 +211,10 @@ describe("Run-reminders cron", () => {
       { id: "r1", business_id: "b1", contact_id: "c1", note: "call back" },
       { id: "r2", business_id: "b1", contact_id: "c2", note: "follow up" },
     ];
-    const res = await cron.POST!({ request: new Request(url, { method: "POST" }) });
+    vi.stubEnv("CRON_SECRET", "topsecret");
+    const res = await cron.POST!({
+      request: new Request(`${url}?token=topsecret`, { method: "POST" }),
+    });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ processed: 2 });
     expect(state.automationInserts).toHaveLength(2);

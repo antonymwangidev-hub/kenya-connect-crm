@@ -86,3 +86,16 @@ export const retrySmsDelivery = createServerFn({ method: "POST" })
     }
     return { ok: true, channel };
   });
+
+export const listAuditLog = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data, error } = await supabase
+      .from("audit_log")
+      .select("id,action,actor_id,actor_email,target_type,target_id,detail,created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
