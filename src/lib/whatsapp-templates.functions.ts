@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { decryptSecret } from "@/lib/crypto.server";
+import { checkRateLimit } from "@/lib/rate-limit.server";
+import { writeAudit } from "@/lib/audit.server";
 
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
 
@@ -274,6 +276,9 @@ export const sendWhatsappTemplate = createServerFn({ method: "POST" })
     const { data: contact, error: cErr } = await supabase
       .from("contacts").select("id,phone,business_id").eq("id", data.contactId).single();
     if (cErr || !contact) throw new Error("Contact not found");
+
+    const withinLimit = await checkRateLimit("send_template_business", contact.business_id, 600, 60);
+    if (!withinLimit) throw new Error("Sending too fast for this workspace. Please retry shortly.");
 
     const { data: tpl, error: tErr } = await supabase
       .from("whatsapp_templates").select("*").eq("id", data.templateId).single();
