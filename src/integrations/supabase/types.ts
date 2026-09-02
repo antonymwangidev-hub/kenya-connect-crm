@@ -402,6 +402,7 @@ export type Database = {
           default_greeting: string | null
           id: string
           logo_url: string | null
+          messaging_provider: string
           mpesa_number: string | null
           mpesa_type: string | null
           name: string
@@ -415,6 +416,7 @@ export type Database = {
           default_greeting?: string | null
           id?: string
           logo_url?: string | null
+          messaging_provider?: string
           mpesa_number?: string | null
           mpesa_type?: string | null
           name: string
@@ -428,6 +430,7 @@ export type Database = {
           default_greeting?: string | null
           id?: string
           logo_url?: string | null
+          messaging_provider?: string
           mpesa_number?: string | null
           mpesa_type?: string | null
           name?: string
@@ -503,11 +506,14 @@ export type Database = {
           business_id: string
           created_at: string
           email: string | null
+          gateway_synced_at: string | null
           id: string
           lead_score: number
           lead_score_updated_at: string | null
           name: string
           notes: string | null
+          opt_in: boolean
+          opt_in_source: string | null
           phone: string
           stage: Database["public"]["Enums"]["contact_stage"]
         }
@@ -516,11 +522,14 @@ export type Database = {
           business_id: string
           created_at?: string
           email?: string | null
+          gateway_synced_at?: string | null
           id?: string
           lead_score?: number
           lead_score_updated_at?: string | null
           name: string
           notes?: string | null
+          opt_in?: boolean
+          opt_in_source?: string | null
           phone: string
           stage?: Database["public"]["Enums"]["contact_stage"]
         }
@@ -529,11 +538,14 @@ export type Database = {
           business_id?: string
           created_at?: string
           email?: string | null
+          gateway_synced_at?: string | null
           id?: string
           lead_score?: number
           lead_score_updated_at?: string | null
           name?: string
           notes?: string | null
+          opt_in?: boolean
+          opt_in_source?: string | null
           phone?: string
           stage?: Database["public"]["Enums"]["contact_stage"]
         }
@@ -662,6 +674,106 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: true
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_settings: {
+        Row: {
+          api_key: string
+          base_url: string
+          business_id: string
+          business_name: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          last_checked_at: string | null
+          updated_at: string
+          webhook_registered_at: string | null
+          webhook_secret: string | null
+          webhook_url: string | null
+          whatsapp_connected: boolean
+        }
+        Insert: {
+          api_key: string
+          base_url: string
+          business_id: string
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_checked_at?: string | null
+          updated_at?: string
+          webhook_registered_at?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+          whatsapp_connected?: boolean
+        }
+        Update: {
+          api_key?: string
+          base_url?: string
+          business_id?: string
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_checked_at?: string | null
+          updated_at?: string
+          webhook_registered_at?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string | null
+          whatsapp_connected?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_settings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_unmatched_messages: {
+        Row: {
+          body: string | null
+          business_id: string | null
+          channel: string | null
+          id: string
+          payload: Json
+          phone: string
+          provider_message_id: string | null
+          received_at: string
+          resolved_at: string | null
+        }
+        Insert: {
+          body?: string | null
+          business_id?: string | null
+          channel?: string | null
+          id?: string
+          payload?: Json
+          phone: string
+          provider_message_id?: string | null
+          received_at?: string
+          resolved_at?: string | null
+        }
+        Update: {
+          body?: string | null
+          business_id?: string | null
+          channel?: string | null
+          id?: string
+          payload?: Json
+          phone?: string
+          provider_message_id?: string | null
+          received_at?: string
+          resolved_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_unmatched_messages_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]
