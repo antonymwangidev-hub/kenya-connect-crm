@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { sendWhatsApp, sendAfricasTalking } from "@/lib/messaging.functions";
+import { sendTextViaProvider, sendAfricasTalking } from "@/lib/messaging.functions";
 
 export const listWebhookLogs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -46,7 +46,7 @@ export const retrySmsDelivery = createServerFn({ method: "POST" })
     let lastError: string | null = null;
     let providerSid: string | null = null;
     try {
-      await sendWhatsApp(log.business_id, log.phone, log.message);
+      await sendTextViaProvider(log.business_id, log.phone, log.message);
     } catch (err) {
       lastError = err instanceof Error ? err.message : "WhatsApp failed";
       try {

@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendWhatsApp, sendAfricasTalking } from "@/lib/messaging.functions";
+import { sendTextViaProvider, sendAfricasTalking } from "@/lib/messaging.functions";
 
 /**
  * Processes queued routing actions (currently outbound messages).
@@ -62,7 +62,7 @@ export async function processRoutingQueue(opts: { businessId?: string; limit?: n
     let channel: "whatsapp" | "sms" = "whatsapp";
     try {
       try {
-        await sendWhatsApp(row.business_id, contact.phone, text);
+        await sendTextViaProvider(row.business_id, contact.phone, text);
       } catch {
         await sendAfricasTalking(row.business_id, contact.phone, text);
         channel = "sms";

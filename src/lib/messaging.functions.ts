@@ -285,3 +285,17 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
 
     return { message: inserted, channel, provider };
   });
+
+/**
+ * Provider-aware plain-text send used by automations, retries, AI auto-reply
+ * and routing. Honours the business's messaging_provider switch (meta|gateway).
+ */
+export async function sendTextViaProvider(businessId: string, toPhone: string, content: string) {
+  const provider = await getMessagingProvider(businessId);
+  if (provider === "gateway") {
+    await gatewaySendText(businessId, toPhone, content, "whatsapp");
+    return { provider };
+  }
+  await sendWhatsApp(businessId, toPhone, content);
+  return { provider };
+}
