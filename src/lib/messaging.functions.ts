@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { decryptSecret } from "@/lib/crypto.server";
 import { checkRateLimit } from "@/lib/rate-limit.server";
 import { writeAudit } from "@/lib/audit.server";
+import { getMessagingProvider, gatewaySendText } from "@/lib/gateway.server";
 
 // Reads per-business creds from channel_credentials (set in onboarding/Settings).
 // Falls back to env vars for backwards compatibility.
@@ -279,8 +280,8 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
       action: "message.sent",
       targetType: "contact",
       targetId: contact.id,
-      detail: { channel, has_media: Boolean(data.media), length: data.content.length },
+      detail: { channel, provider, has_media: Boolean(data.media), length: data.content.length },
     });
 
-    return { message: inserted, channel };
+    return { message: inserted, channel, provider };
   });
