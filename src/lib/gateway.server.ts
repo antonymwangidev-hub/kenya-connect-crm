@@ -198,6 +198,30 @@ export async function gatewaySendTemplate(opts: {
   return { messageId: res.data?.messageId ?? null, status: res.data?.status ?? "QUEUED" };
 }
 
+/**
+ * Trigger the gateway's WhatsApp typing indicator for a contact.
+ * The gateway resolves the latest inbound WhatsApp message itself — never send
+ * a wamid/providerMessageId. 404 (unknown contact) and 403 (no prior inbound
+ * message) are expected and treated as silent no-ops.
+ */
+export async function gatewaySendTyping(businessId: string, toPhone: string): Promise<{ ok: boolean }> {
+  const settings = await loadGatewaySettings(businessId);
+  if (!settings || !settings.is_active) return { ok: false };
+  const to = toE164(toPhone);
+  if (!isE164(to)) return { ok: false };
+  const res = await gatewayFetch({
+    baseUrl: settings.base_url,
+    apiKey: settings.api_key,
+    path: "/api/v1/messages/typing",
+    method: "POST",
+    body: { to },
+  });
+  if (!res.ok && res.status !== 404 && res.status !== 403) {
+    console.warn(`[gateway] typing indicator failed (${res.status}): ${res.error}`);
+  }
+  return { ok: res.ok };
+}
+
 export function gatewayErrorText(res: GatewayResponse): string {
   const base = res.error ?? "Gateway send failed";
   if (res.status === 403 && /opt/i.test(base)) {
