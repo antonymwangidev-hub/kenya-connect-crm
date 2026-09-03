@@ -20,6 +20,7 @@ import {
   type AiAssistantSettings,
 } from "@/lib/ai-assistant.functions";
 import { KnowledgeBaseSection } from "@/components/KnowledgeBaseSection";
+import { GatewaySection } from "@/components/GatewaySection";
 
 export const Route = createFileRoute("/app/settings")({
   component: SettingsPage,
@@ -347,6 +348,8 @@ function SettingsPage() {
       </section>
 
       <KnowledgeBaseSection />
+
+      <GatewaySection />
 
 
 
