@@ -207,10 +207,21 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
     let channel: "whatsapp" | "sms" = "whatsapp";
     let lastError: string | null = null;
 
+    const provider = await getMessagingProvider(contact.business_id);
+
     try {
-      await sendWhatsApp(contact.business_id, contact.phone, data.content, mediaForSend);
+      if (provider === "gateway") {
+        // Nexus gateway path — media is delivered as a link in the message body.
+        const body = mediaForSend
+          ? [data.content, mediaForSend.url].filter(Boolean).join("\n")
+          : data.content;
+        await gatewaySendText(contact.business_id, contact.phone, body, "whatsapp");
+      } else {
+        await sendWhatsApp(contact.business_id, contact.phone, data.content, mediaForSend);
+      }
     } catch (err) {
       lastError = err instanceof Error ? err.message : "WhatsApp failed";
+
       if (mediaForSend) {
         // Media over SMS is not supported by AT; surface the WhatsApp error.
         throw new Error(`WhatsApp send failed: ${lastError}`);
