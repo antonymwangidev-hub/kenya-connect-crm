@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { sendWhatsApp, sendAfricasTalking } from "@/lib/messaging.functions";
+import { sendTextViaProvider, sendAfricasTalking } from "@/lib/messaging.functions";
 import { checkRateLimit } from "@/lib/rate-limit.server";
 import { writeAudit } from "@/lib/audit.server";
 
@@ -56,7 +56,7 @@ export const sendBroadcast = createServerFn({ method: "POST" })
       let err: string | null = null;
       try {
         try {
-          await sendWhatsApp(businessId, c.phone, data.content);
+          await sendTextViaProvider(businessId, c.phone, data.content);
           channel = "whatsapp";
         } catch (waErr) {
           // Fallback to SMS via Africa's Talking

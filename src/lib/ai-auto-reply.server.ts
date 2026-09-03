@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendWhatsApp } from "@/lib/messaging.functions";
+import { sendTextViaProvider } from "@/lib/messaging.functions";
 
 type AiRow = {
   enabled: boolean;
@@ -150,7 +150,7 @@ export async function maybeAutoReply(opts: {
       return;
     }
 
-    await sendWhatsApp(opts.businessId, opts.toPhone, reply);
+    await sendTextViaProvider(opts.businessId, opts.toPhone, reply);
 
     const { error: insErr } = await supabaseAdmin.from("messages").insert({
       contact_id: opts.contactId,

@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { decryptSecret } from "@/lib/crypto.server";
 import { checkRateLimit } from "@/lib/rate-limit.server";
 import { writeAudit } from "@/lib/audit.server";
+import { getMessagingProvider, gatewaySendText } from "@/lib/gateway.server";
 
 // Reads per-business creds from channel_credentials (set in onboarding/Settings).
 // Falls back to env vars for backwards compatibility.
@@ -207,10 +208,21 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
     let channel: "whatsapp" | "sms" = "whatsapp";
     let lastError: string | null = null;
 
+    const provider = await getMessagingProvider(contact.business_id);
+
     try {
-      await sendWhatsApp(contact.business_id, contact.phone, data.content, mediaForSend);
+      if (provider === "gateway") {
+        // Nexus gateway path — media is delivered as a link in the message body.
+        const body = mediaForSend
+          ? [data.content, mediaForSend.url].filter(Boolean).join("\n")
+          : data.content;
+        await gatewaySendText(contact.business_id, contact.phone, body, "whatsapp");
+      } else {
+        await sendWhatsApp(contact.business_id, contact.phone, data.content, mediaForSend);
+      }
     } catch (err) {
       lastError = err instanceof Error ? err.message : "WhatsApp failed";
+
       if (mediaForSend) {
         // Media over SMS is not supported by AT; surface the WhatsApp error.
         throw new Error(`WhatsApp send failed: ${lastError}`);
@@ -268,8 +280,22 @@ export const sendOutboundMessage = createServerFn({ method: "POST" })
       action: "message.sent",
       targetType: "contact",
       targetId: contact.id,
-      detail: { channel, has_media: Boolean(data.media), length: data.content.length },
+      detail: { channel, provider, has_media: Boolean(data.media), length: data.content.length },
     });
 
-    return { message: inserted, channel };
+    return { message: inserted, channel, provider };
   });
+
+/**
+ * Provider-aware plain-text send used by automations, retries, AI auto-reply
+ * and routing. Honours the business's messaging_provider switch (meta|gateway).
+ */
+export async function sendTextViaProvider(businessId: string, toPhone: string, content: string) {
+  const provider = await getMessagingProvider(businessId);
+  if (provider === "gateway") {
+    await gatewaySendText(businessId, toPhone, content, "whatsapp");
+    return { provider };
+  }
+  await sendWhatsApp(businessId, toPhone, content);
+  return { provider };
+}
