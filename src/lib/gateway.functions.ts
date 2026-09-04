@@ -287,3 +287,24 @@ export const listUnmatchedGatewayMessages = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { messages: data ?? [] };
   });
+
+/** Fire the gateway's native WhatsApp typing indicator for a contact (debounced client-side). */
+export const sendTypingIndicator = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ contactId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: contact } = await supabase
+      .from("contacts")
+      .select("id,phone,business_id")
+      .eq("id", data.contactId)
+      .maybeSingle();
+    if (!contact) return { ok: false };
+    const { getMessagingProvider, gatewaySendTyping } = await import("@/lib/gateway.server");
+    if ((await getMessagingProvider(contact.business_id)) !== "gateway") return { ok: false };
+    try {
+      return await gatewaySendTyping(contact.business_id, contact.phone);
+    } catch {
+      return { ok: false };
+    }
+  });

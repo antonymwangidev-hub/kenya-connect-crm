@@ -88,6 +88,10 @@ export function GatewaySection() {
     }
   };
 
+  const manualWebhookUrl =
+    status?.webhook_url ??
+    (typeof window !== "undefined" ? `${window.location.origin}/api/public/gateway/webhook` : "/api/public/gateway/webhook");
+
   return (
     <section className="space-y-4 rounded-2xl border bg-card p-5">
       <div className="flex items-start justify-between gap-4">
@@ -164,12 +168,29 @@ export function GatewaySection() {
               </Button>
             </div>
           ) : (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-amber-700">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                Sending works, but inbound replies are not verified yet. Re-verify to register the receiving
-                webhook with the gateway.
-              </span>
+            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-amber-700">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Automatic webhook registration did not complete. Register this URL manually in your gateway
+                  dashboard, then save the signing secret it gives you as the project secret{" "}
+                  <code className="font-mono">GATEWAY_WEBHOOK_SECRET</code> — inbound replies will start working.
+                </span>
+              </div>
+              <div className="flex items-center gap-2 rounded-md border bg-background/60 p-2 text-foreground">
+                <span className="truncate font-mono">{manualWebhookUrl}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    navigator.clipboard.writeText(manualWebhookUrl);
+                    toast.success("Webhook URL copied");
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           )}
 

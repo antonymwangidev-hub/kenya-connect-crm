@@ -29,13 +29,21 @@ async function resolveBusiness(rawBody: string, signature: string | null) {
     .from("gateway_settings")
     .select("business_id,webhook_secret")
     .eq("is_active", true);
-  for (const row of data ?? []) {
+  const rows = data ?? [];
+  for (const row of rows) {
     if (!row.webhook_secret) continue;
     const secret = (await decryptSecret(row.webhook_secret)) ?? row.webhook_secret;
     if (verify(rawBody, signature, secret)) return row.business_id as string;
   }
+  // Manual fallback: webhook registered by hand in the gateway dashboard and its
+  // signing secret stored as the GATEWAY_WEBHOOK_SECRET project secret.
+  const envSecret = process.env["GATEWAY_WEBHOOK_SECRET"];
+  if (envSecret && verify(rawBody, signature, envSecret)) {
+    return (rows[0]?.business_id as string | undefined) ?? null;
+  }
   return null;
 }
+
 
 async function logEvent(businessId: string | null, payload: Record<string, unknown>, error?: string | null) {
   const { error: logErr } = await supabaseAdmin.from("webhook_logs").insert({

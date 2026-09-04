@@ -16,6 +16,7 @@ import { SendTemplateModal } from "@/components/SendTemplateModal";
 import { sendOutboundMessage } from "@/lib/messaging.functions";
 import { createChatMediaUploadUrl } from "@/lib/media.functions";
 import { suggestReply } from "@/lib/ai.functions";
+import { sendTypingIndicator } from "@/lib/gateway.functions";
 import { MediaBubble } from "./MediaBubble";
 import { InternalNotes } from "./InternalNotes";
 import { CannedReplies } from "./CannedReplies";
@@ -66,6 +67,8 @@ export function ChatWindow({
   const fileRef = useRef<HTMLInputElement>(null);
   const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gatewayTypingSent = useRef(false);
+  const gatewayTypingReset = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const send = useServerFn(sendOutboundMessage);
   const uploadUrlFn = useServerFn(createChatMediaUploadUrl);
@@ -142,6 +145,15 @@ export function ChatWindow({
       supabase.removeChannel(ch);
     };
   }, [conversation.id, userId, myName]);
+
+  const typingFn = useServerFn(sendTypingIndicator);
+  const pingGatewayTyping = useCallback(() => {
+    if (gatewayTypingSent.current) return;
+    gatewayTypingSent.current = true;
+    if (gatewayTypingReset.current) clearTimeout(gatewayTypingReset.current);
+    gatewayTypingReset.current = setTimeout(() => { gatewayTypingSent.current = false; }, 4000);
+    void typingFn({ data: { contactId: conversation.contact.id } }).catch(() => {});
+  }, [typingFn, conversation.contact.id]);
 
   const broadcastTyping = (typing: boolean) => {
     if (!userId) return;
@@ -225,6 +237,7 @@ export function ChatWindow({
       setFile(null);
       setProgress(0);
       broadcastTyping(false);
+      gatewayTypingSent.current = false;
       await loadMessages();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Send failed");
@@ -443,6 +456,7 @@ export function ChatWindow({
                   onChange={(e) => {
                     setText(e.target.value);
                     broadcastTyping(true);
+                    pingGatewayTyping();
                     if (typingTimer.current) clearTimeout(typingTimer.current);
                     typingTimer.current = setTimeout(() => broadcastTyping(false), 2500);
                   }}

@@ -689,6 +689,7 @@ export type Database = {
           is_active: boolean
           last_checked_at: string | null
           updated_at: string
+          user_id: string | null
           webhook_registered_at: string | null
           webhook_secret: string | null
           webhook_url: string | null
@@ -704,6 +705,7 @@ export type Database = {
           is_active?: boolean
           last_checked_at?: string | null
           updated_at?: string
+          user_id?: string | null
           webhook_registered_at?: string | null
           webhook_secret?: string | null
           webhook_url?: string | null
@@ -719,6 +721,7 @@ export type Database = {
           is_active?: boolean
           last_checked_at?: string | null
           updated_at?: string
+          user_id?: string | null
           webhook_registered_at?: string | null
           webhook_secret?: string | null
           webhook_url?: string | null
