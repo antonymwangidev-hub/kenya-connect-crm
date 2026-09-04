@@ -5,6 +5,11 @@ import { decryptSecret } from "@/lib/crypto.server";
 import { checkRateLimit } from "@/lib/rate-limit.server";
 import { writeAudit } from "@/lib/audit.server";
 
+async function sbAdmin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
 
 function maskToken(t: string | null | undefined) {
@@ -43,7 +48,7 @@ async function resolveWabaTokenForAccount(
   )?.trim();
   if (connToken) return { token: connToken, source: "whatsapp_connections.meta.access_token" as const };
 
-  const { data: credsRow } = await supabase
+  const { data: credsRow } = await (await sbAdmin())
     .from("channel_credentials")
     .select("credentials,is_active")
     .eq("business_id", account.business_id)
@@ -108,7 +113,7 @@ async function loadAccountForUser(
   const bizIds = (biz as Array<{ id: string }> | null)?.map((b) => b.id) ?? [];
   if (bizIds.length === 0) throw new Error("Business not found");
 
-  const { data, error } = await supabase
+  const { data, error } = await (await sbAdmin())
     .from("whatsapp_business_accounts")
     .select("id,business_id,business_name,waba_id,phone_number_id,access_token,status")
     .eq("id", accountId)
@@ -124,9 +129,13 @@ export const listWhatsappAccounts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const { data, error } = await supabase
+    const { data: ownBiz } = await supabase.from("businesses").select("id");
+    const bizIds = (ownBiz ?? []).map((b) => b.id);
+    if (bizIds.length === 0) return { accounts: [] };
+    const { data, error } = await (await sbAdmin())
       .from("whatsapp_business_accounts")
       .select(SAFE_ACCOUNT_COLS)
+      .in("business_id", bizIds)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     return { accounts: data ?? [] };

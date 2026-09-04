@@ -4,6 +4,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { decryptSecret, encryptFields, encryptSecret } from "@/lib/crypto.server";
 import { writeAudit } from "@/lib/audit.server";
 
+async function sbAdmin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
 const providerSchema = z.enum(["whatsapp", "africastalking", "mpesa"]);
 
 type ProviderName = z.infer<typeof providerSchema>;
@@ -43,9 +48,16 @@ export const listChannelCredentials = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ creds: CredMeta[] }> => {
     const { supabase } = context;
-    const { data, error } = await supabase
+    // Secrets are read with the privileged client and never exposed to the
+    // browser: only masked hints and whitelisted public fields are returned.
+    const { data: ownBiz } = await supabase.from("businesses").select("id");
+    const bizIds = (ownBiz ?? []).map((b) => b.id);
+    if (bizIds.length === 0) return { creds: [] };
+    const admin = await sbAdmin();
+    const { data, error } = await admin
       .from("channel_credentials")
-      .select("provider, is_active, credentials");
+      .select("provider, is_active, credentials")
+      .in("business_id", bizIds);
     if (error) throw new Error(error.message);
 
     const creds: CredMeta[] = [];
@@ -99,7 +111,7 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
     if (bizErr || !biz) throw new Error("Business not found");
 
     // Read existing creds (RLS scopes to owner)
-    const { data: existing } = await supabase
+    const { data: existing } = await (await sbAdmin())
       .from("channel_credentials")
       .select("credentials, is_active")
       .eq("business_id", biz.id)

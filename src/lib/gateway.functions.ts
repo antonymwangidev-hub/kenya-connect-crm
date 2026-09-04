@@ -115,7 +115,8 @@ export const connectGateway = createServerFn({ method: "POST" })
         : `Sending will work, but receiving replies is not set up: ${reg.error}`;
     }
 
-    const { error: upsertErr } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: upsertErr } = await supabaseAdmin
       .from("gateway_settings")
       .upsert(
         {
@@ -167,7 +168,8 @@ export const disconnectGateway = createServerFn({ method: "POST" })
         method: "DELETE",
       });
     }
-    const { error } = await supabase.from("gateway_settings").delete().eq("business_id", biz.id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("gateway_settings").delete().eq("business_id", biz.id);
     if (error) throw new Error(error.message);
     await supabase.from("businesses").update({ messaging_provider: "meta" }).eq("id", biz.id);
     await writeAudit({
