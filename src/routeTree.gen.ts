@@ -9,39 +9,39 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as WhatsappCallbackRouteImport } from './routes/whatsapp.callback'
-import { Route as AppWhatsappDiagnosticsRouteImport } from './routes/app.whatsapp-diagnostics'
-import { Route as AppWhatsappRouteImport } from './routes/app.whatsapp'
-import { Route as AppTemplatesRouteImport } from './routes/app.templates'
-import { Route as AppTagsRouteImport } from './routes/app.tags'
-import { Route as AppSettingsRouteImport } from './routes/app.settings'
-import { Route as AppRemindersRouteImport } from './routes/app.reminders'
-import { Route as AppPipelineRouteImport } from './routes/app.pipeline'
-import { Route as AppPerformanceRouteImport } from './routes/app.performance'
-import { Route as AppOnboardingRouteImport } from './routes/app.onboarding'
-import { Route as AppLogsRouteImport } from './routes/app.logs'
-import { Route as AppLeadsRouteImport } from './routes/app.leads'
-import { Route as AppInsightsRouteImport } from './routes/app.insights'
-import { Route as AppInboxRouteImport } from './routes/app.inbox'
-import { Route as AppConversationsRouteImport } from './routes/app.conversations'
-import { Route as AppContactsRouteImport } from './routes/app.contacts'
-import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
-import { Route as AppAutomationsRouteImport } from './routes/app.automations'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
-import { Route as AppInboxConversationIdRouteImport } from './routes/app.inbox.$conversationId'
-import { Route as ApiPublicRunRemindersRouteImport } from './routes/api/public/run-reminders'
+import { Route as AppAutomationsRouteImport } from './routes/app.automations'
+import { Route as AppBroadcastsRouteImport } from './routes/app.broadcasts'
+import { Route as AppContactsRouteImport } from './routes/app.contacts'
+import { Route as AppConversationsRouteImport } from './routes/app.conversations'
+import { Route as AppInboxRouteImport } from './routes/app.inbox'
+import { Route as AppInsightsRouteImport } from './routes/app.insights'
+import { Route as AppLeadsRouteImport } from './routes/app.leads'
+import { Route as AppLogsRouteImport } from './routes/app.logs'
+import { Route as AppOnboardingRouteImport } from './routes/app.onboarding'
+import { Route as AppPerformanceRouteImport } from './routes/app.performance'
+import { Route as AppPipelineRouteImport } from './routes/app.pipeline'
+import { Route as AppRemindersRouteImport } from './routes/app.reminders'
+import { Route as AppSettingsRouteImport } from './routes/app.settings'
+import { Route as AppTagsRouteImport } from './routes/app.tags'
+import { Route as AppTemplatesRouteImport } from './routes/app.templates'
+import { Route as AppWhatsappRouteImport } from './routes/app.whatsapp'
+import { Route as AppWhatsappDiagnosticsRouteImport } from './routes/app.whatsapp-diagnostics'
+import { Route as WhatsappCallbackRouteImport } from './routes/whatsapp.callback'
 import { Route as ApiPublicRunAutomationsRouteImport } from './routes/api/public/run-automations'
-import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
-import { Route as ApiPublicMpesaWebhookRouteImport } from './routes/api/public/mpesa.webhook'
-import { Route as ApiPublicGatewayWebhookRouteImport } from './routes/api/public/gateway.webhook'
+import { Route as ApiPublicRunRemindersRouteImport } from './routes/api/public/run-reminders'
+import { Route as AppInboxConversationIdRouteImport } from './routes/app.inbox.$conversationId'
 import { Route as ApiPublicAtWebhookRouteImport } from './routes/api/public/at.webhook'
+import { Route as ApiPublicGatewayWebhookRouteImport } from './routes/api/public/gateway.webhook'
+import { Route as ApiPublicMpesaWebhookRouteImport } from './routes/api/public/mpesa.webhook'
+import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -49,94 +49,14 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WhatsappCallbackRoute = WhatsappCallbackRouteImport.update({
-  id: '/whatsapp/callback',
-  path: '/whatsapp/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AppWhatsappDiagnosticsRoute = AppWhatsappDiagnosticsRouteImport.update({
-  id: '/whatsapp-diagnostics',
-  path: '/whatsapp-diagnostics',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppWhatsappRoute = AppWhatsappRouteImport.update({
-  id: '/whatsapp',
-  path: '/whatsapp',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppTemplatesRoute = AppTemplatesRouteImport.update({
-  id: '/templates',
-  path: '/templates',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppTagsRoute = AppTagsRouteImport.update({
-  id: '/tags',
-  path: '/tags',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppRemindersRoute = AppRemindersRouteImport.update({
-  id: '/reminders',
-  path: '/reminders',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPipelineRoute = AppPipelineRouteImport.update({
-  id: '/pipeline',
-  path: '/pipeline',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPerformanceRoute = AppPerformanceRouteImport.update({
-  id: '/performance',
-  path: '/performance',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppOnboardingRoute = AppOnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppLogsRoute = AppLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppLeadsRoute = AppLeadsRouteImport.update({
-  id: '/leads',
-  path: '/leads',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppInsightsRoute = AppInsightsRouteImport.update({
-  id: '/insights',
-  path: '/insights',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppInboxRoute = AppInboxRouteImport.update({
-  id: '/inbox',
-  path: '/inbox',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppConversationsRoute = AppConversationsRouteImport.update({
-  id: '/conversations',
-  path: '/conversations',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppContactsRoute = AppContactsRouteImport.update({
-  id: '/contacts',
-  path: '/contacts',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppBroadcastsRoute = AppBroadcastsRouteImport.update({
-  id: '/broadcasts',
-  path: '/broadcasts',
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAutomationsRoute = AppAutomationsRouteImport.update({
@@ -144,24 +64,119 @@ const AppAutomationsRoute = AppAutomationsRouteImport.update({
   path: '/automations',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
+const AppBroadcastsRoute = AppBroadcastsRouteImport.update({
+  id: '/broadcasts',
+  path: '/broadcasts',
   getParentRoute: () => AppRoute,
 } as any)
-const AppInboxConversationIdRoute = AppInboxConversationIdRouteImport.update({
-  id: '/$conversationId',
-  path: '/$conversationId',
-  getParentRoute: () => AppInboxRoute,
+const AppContactsRoute = AppContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConversationsRoute = AppConversationsRouteImport.update({
+  id: '/conversations',
+  path: '/conversations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInboxRoute = AppInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInsightsRoute = AppInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLeadsRoute = AppLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLogsRoute = AppLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOnboardingRoute = AppOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPerformanceRoute = AppPerformanceRouteImport.update({
+  id: '/performance',
+  path: '/performance',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPipelineRoute = AppPipelineRouteImport.update({
+  id: '/pipeline',
+  path: '/pipeline',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRemindersRoute = AppRemindersRouteImport.update({
+  id: '/reminders',
+  path: '/reminders',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTagsRoute = AppTagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTemplatesRoute = AppTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppWhatsappRoute = AppWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppWhatsappDiagnosticsRoute = AppWhatsappDiagnosticsRouteImport.update({
+  id: '/whatsapp-diagnostics',
+  path: '/whatsapp-diagnostics',
+  getParentRoute: () => AppRoute,
+} as any)
+const WhatsappCallbackRoute = WhatsappCallbackRouteImport.update({
+  id: '/whatsapp/callback',
+  path: '/whatsapp/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicRunAutomationsRoute = ApiPublicRunAutomationsRouteImport.update({
+  id: '/api/public/run-automations',
+  path: '/api/public/run-automations',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicRunRemindersRoute = ApiPublicRunRemindersRouteImport.update({
   id: '/api/public/run-reminders',
   path: '/api/public/run-reminders',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicRunAutomationsRoute = ApiPublicRunAutomationsRouteImport.update({
-  id: '/api/public/run-automations',
-  path: '/api/public/run-automations',
+const AppInboxConversationIdRoute = AppInboxConversationIdRouteImport.update({
+  id: '/$conversationId',
+  path: '/$conversationId',
+  getParentRoute: () => AppInboxRoute,
+} as any)
+const ApiPublicAtWebhookRoute = ApiPublicAtWebhookRouteImport.update({
+  id: '/api/public/at/webhook',
+  path: '/api/public/at/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGatewayWebhookRoute = ApiPublicGatewayWebhookRouteImport.update({
+  id: '/api/public/gateway/webhook',
+  path: '/api/public/gateway/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicMpesaWebhookRoute = ApiPublicMpesaWebhookRouteImport.update({
+  id: '/api/public/mpesa/webhook',
+  path: '/api/public/mpesa/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicWhatsappWebhookRoute =
@@ -170,21 +185,6 @@ const ApiPublicWhatsappWebhookRoute =
     path: '/api/public/whatsapp/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicMpesaWebhookRoute = ApiPublicMpesaWebhookRouteImport.update({
-  id: '/api/public/mpesa/webhook',
-  path: '/api/public/mpesa/webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicGatewayWebhookRoute = ApiPublicGatewayWebhookRouteImport.update({
-  id: '/api/public/gateway/webhook',
-  path: '/api/public/gateway/webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicAtWebhookRoute = ApiPublicAtWebhookRouteImport.update({
-  id: '/api/public/at/webhook',
-  path: '/api/public/at/webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -391,11 +391,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -405,130 +405,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/whatsapp/callback': {
-      id: '/whatsapp/callback'
-      path: '/whatsapp/callback'
-      fullPath: '/whatsapp/callback'
-      preLoaderRoute: typeof WhatsappCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/app/whatsapp-diagnostics': {
-      id: '/app/whatsapp-diagnostics'
-      path: '/whatsapp-diagnostics'
-      fullPath: '/app/whatsapp-diagnostics'
-      preLoaderRoute: typeof AppWhatsappDiagnosticsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/whatsapp': {
-      id: '/app/whatsapp'
-      path: '/whatsapp'
-      fullPath: '/app/whatsapp'
-      preLoaderRoute: typeof AppWhatsappRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/templates': {
-      id: '/app/templates'
-      path: '/templates'
-      fullPath: '/app/templates'
-      preLoaderRoute: typeof AppTemplatesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/tags': {
-      id: '/app/tags'
-      path: '/tags'
-      fullPath: '/app/tags'
-      preLoaderRoute: typeof AppTagsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/settings': {
-      id: '/app/settings'
-      path: '/settings'
-      fullPath: '/app/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/reminders': {
-      id: '/app/reminders'
-      path: '/reminders'
-      fullPath: '/app/reminders'
-      preLoaderRoute: typeof AppRemindersRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/pipeline': {
-      id: '/app/pipeline'
-      path: '/pipeline'
-      fullPath: '/app/pipeline'
-      preLoaderRoute: typeof AppPipelineRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/performance': {
-      id: '/app/performance'
-      path: '/performance'
-      fullPath: '/app/performance'
-      preLoaderRoute: typeof AppPerformanceRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/onboarding': {
-      id: '/app/onboarding'
-      path: '/onboarding'
-      fullPath: '/app/onboarding'
-      preLoaderRoute: typeof AppOnboardingRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/logs': {
-      id: '/app/logs'
-      path: '/logs'
-      fullPath: '/app/logs'
-      preLoaderRoute: typeof AppLogsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/leads': {
-      id: '/app/leads'
-      path: '/leads'
-      fullPath: '/app/leads'
-      preLoaderRoute: typeof AppLeadsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/insights': {
-      id: '/app/insights'
-      path: '/insights'
-      fullPath: '/app/insights'
-      preLoaderRoute: typeof AppInsightsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/inbox': {
-      id: '/app/inbox'
-      path: '/inbox'
-      fullPath: '/app/inbox'
-      preLoaderRoute: typeof AppInboxRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/conversations': {
-      id: '/app/conversations'
-      path: '/conversations'
-      fullPath: '/app/conversations'
-      preLoaderRoute: typeof AppConversationsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/contacts': {
-      id: '/app/contacts'
-      path: '/contacts'
-      fullPath: '/app/contacts'
-      preLoaderRoute: typeof AppContactsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/broadcasts': {
-      id: '/app/broadcasts'
-      path: '/broadcasts'
-      fullPath: '/app/broadcasts'
-      preLoaderRoute: typeof AppBroadcastsRouteImport
+    '/app/analytics': {
+      id: '/app/analytics'
+      path: '/analytics'
+      fullPath: '/app/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/automations': {
@@ -538,25 +426,123 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAutomationsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/analytics': {
-      id: '/app/analytics'
-      path: '/analytics'
-      fullPath: '/app/analytics'
-      preLoaderRoute: typeof AppAnalyticsRouteImport
+    '/app/broadcasts': {
+      id: '/app/broadcasts'
+      path: '/broadcasts'
+      fullPath: '/app/broadcasts'
+      preLoaderRoute: typeof AppBroadcastsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/inbox/$conversationId': {
-      id: '/app/inbox/$conversationId'
-      path: '/$conversationId'
-      fullPath: '/app/inbox/$conversationId'
-      preLoaderRoute: typeof AppInboxConversationIdRouteImport
-      parentRoute: typeof AppInboxRoute
+    '/app/contacts': {
+      id: '/app/contacts'
+      path: '/contacts'
+      fullPath: '/app/contacts'
+      preLoaderRoute: typeof AppContactsRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/api/public/run-reminders': {
-      id: '/api/public/run-reminders'
-      path: '/api/public/run-reminders'
-      fullPath: '/api/public/run-reminders'
-      preLoaderRoute: typeof ApiPublicRunRemindersRouteImport
+    '/app/conversations': {
+      id: '/app/conversations'
+      path: '/conversations'
+      fullPath: '/app/conversations'
+      preLoaderRoute: typeof AppConversationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inbox': {
+      id: '/app/inbox'
+      path: '/inbox'
+      fullPath: '/app/inbox'
+      preLoaderRoute: typeof AppInboxRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/insights': {
+      id: '/app/insights'
+      path: '/insights'
+      fullPath: '/app/insights'
+      preLoaderRoute: typeof AppInsightsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/leads': {
+      id: '/app/leads'
+      path: '/leads'
+      fullPath: '/app/leads'
+      preLoaderRoute: typeof AppLeadsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/logs': {
+      id: '/app/logs'
+      path: '/logs'
+      fullPath: '/app/logs'
+      preLoaderRoute: typeof AppLogsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/onboarding': {
+      id: '/app/onboarding'
+      path: '/onboarding'
+      fullPath: '/app/onboarding'
+      preLoaderRoute: typeof AppOnboardingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/performance': {
+      id: '/app/performance'
+      path: '/performance'
+      fullPath: '/app/performance'
+      preLoaderRoute: typeof AppPerformanceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/pipeline': {
+      id: '/app/pipeline'
+      path: '/pipeline'
+      fullPath: '/app/pipeline'
+      preLoaderRoute: typeof AppPipelineRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reminders': {
+      id: '/app/reminders'
+      path: '/reminders'
+      fullPath: '/app/reminders'
+      preLoaderRoute: typeof AppRemindersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/tags': {
+      id: '/app/tags'
+      path: '/tags'
+      fullPath: '/app/tags'
+      preLoaderRoute: typeof AppTagsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/templates': {
+      id: '/app/templates'
+      path: '/templates'
+      fullPath: '/app/templates'
+      preLoaderRoute: typeof AppTemplatesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/whatsapp': {
+      id: '/app/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/app/whatsapp'
+      preLoaderRoute: typeof AppWhatsappRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/whatsapp-diagnostics': {
+      id: '/app/whatsapp-diagnostics'
+      path: '/whatsapp-diagnostics'
+      fullPath: '/app/whatsapp-diagnostics'
+      preLoaderRoute: typeof AppWhatsappDiagnosticsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/whatsapp/callback': {
+      id: '/whatsapp/callback'
+      path: '/whatsapp/callback'
+      fullPath: '/whatsapp/callback'
+      preLoaderRoute: typeof WhatsappCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/run-automations': {
@@ -566,18 +552,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRunAutomationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/whatsapp/webhook': {
-      id: '/api/public/whatsapp/webhook'
-      path: '/api/public/whatsapp/webhook'
-      fullPath: '/api/public/whatsapp/webhook'
-      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
+    '/api/public/run-reminders': {
+      id: '/api/public/run-reminders'
+      path: '/api/public/run-reminders'
+      fullPath: '/api/public/run-reminders'
+      preLoaderRoute: typeof ApiPublicRunRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/mpesa/webhook': {
-      id: '/api/public/mpesa/webhook'
-      path: '/api/public/mpesa/webhook'
-      fullPath: '/api/public/mpesa/webhook'
-      preLoaderRoute: typeof ApiPublicMpesaWebhookRouteImport
+    '/app/inbox/$conversationId': {
+      id: '/app/inbox/$conversationId'
+      path: '/$conversationId'
+      fullPath: '/app/inbox/$conversationId'
+      preLoaderRoute: typeof AppInboxConversationIdRouteImport
+      parentRoute: typeof AppInboxRoute
+    }
+    '/api/public/at/webhook': {
+      id: '/api/public/at/webhook'
+      path: '/api/public/at/webhook'
+      fullPath: '/api/public/at/webhook'
+      preLoaderRoute: typeof ApiPublicAtWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/gateway/webhook': {
@@ -587,11 +580,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicGatewayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/at/webhook': {
-      id: '/api/public/at/webhook'
-      path: '/api/public/at/webhook'
-      fullPath: '/api/public/at/webhook'
-      preLoaderRoute: typeof ApiPublicAtWebhookRouteImport
+    '/api/public/mpesa/webhook': {
+      id: '/api/public/mpesa/webhook'
+      path: '/api/public/mpesa/webhook'
+      fullPath: '/api/public/mpesa/webhook'
+      preLoaderRoute: typeof ApiPublicMpesaWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/whatsapp/webhook': {
+      id: '/api/public/whatsapp/webhook'
+      path: '/api/public/whatsapp/webhook'
+      fullPath: '/api/public/whatsapp/webhook'
+      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
