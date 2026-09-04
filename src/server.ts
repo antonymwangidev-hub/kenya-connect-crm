@@ -120,7 +120,7 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return applySecurityHeaders(await normalizeCatastrophicSsrResponse(response));
+      return applySecurityHeaders(await normalizeCatastrophicSsrResponse(response, request));
     } catch (error) {
       console.error(error);
       return applySecurityHeaders(brandedErrorResponse());
