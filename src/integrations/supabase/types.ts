@@ -692,6 +692,8 @@ export type Database = {
           user_id: string | null
           webhook_registered_at: string | null
           webhook_secret: string | null
+          webhook_secret_source: string
+          webhook_token: string
           webhook_url: string | null
           whatsapp_connected: boolean
         }
@@ -708,6 +710,8 @@ export type Database = {
           user_id?: string | null
           webhook_registered_at?: string | null
           webhook_secret?: string | null
+          webhook_secret_source?: string
+          webhook_token?: string
           webhook_url?: string | null
           whatsapp_connected?: boolean
         }
@@ -724,6 +728,8 @@ export type Database = {
           user_id?: string | null
           webhook_registered_at?: string | null
           webhook_secret?: string | null
+          webhook_secret_source?: string
+          webhook_token?: string
           webhook_url?: string | null
           whatsapp_connected?: boolean
         }
