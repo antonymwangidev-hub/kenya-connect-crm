@@ -50,9 +50,14 @@ export const getEmbeddedSignupConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const { data } = await supabase
+    const { data: ownBiz } = await supabase.from("businesses").select("id");
+    const bizIds = (ownBiz ?? []).map((b) => b.id);
+    if (bizIds.length === 0) return { ready: false, appId: null, configId: null };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
       .from("channel_credentials")
       .select("credentials")
+      .in("business_id", bizIds)
       .eq("provider", "whatsapp")
       .maybeSingle();
     const creds = (data?.credentials as Record<string, string> | null) ?? {};
