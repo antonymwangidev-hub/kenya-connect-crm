@@ -38,6 +38,7 @@ import { Route as ApiPublicAtWebhookRouteImport } from './routes/api/public/at.w
 import { Route as ApiPublicGatewayWebhookRouteImport } from './routes/api/public/gateway.webhook'
 import { Route as ApiPublicMpesaWebhookRouteImport } from './routes/api/public/mpesa.webhook'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
+import { Route as ApiPublicGatewayWebhookTokenRouteImport } from './routes/api/public/gateway.webhook.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -185,6 +186,12 @@ const ApiPublicWhatsappWebhookRoute =
     path: '/api/public/whatsapp/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicGatewayWebhookTokenRoute =
+  ApiPublicGatewayWebhookTokenRouteImport.update({
+    id: '/$token',
+    path: '/$token',
+    getParentRoute: () => ApiPublicGatewayWebhookRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -213,9 +220,10 @@ export interface FileRoutesByFullPath {
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
-  '/api/public/gateway/webhook': typeof ApiPublicGatewayWebhookRoute
+  '/api/public/gateway/webhook': typeof ApiPublicGatewayWebhookRouteWithChildren
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/gateway/webhook/$token': typeof ApiPublicGatewayWebhookTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -244,9 +252,10 @@ export interface FileRoutesByTo {
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
-  '/api/public/gateway/webhook': typeof ApiPublicGatewayWebhookRoute
+  '/api/public/gateway/webhook': typeof ApiPublicGatewayWebhookRouteWithChildren
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/gateway/webhook/$token': typeof ApiPublicGatewayWebhookTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -276,9 +285,10 @@ export interface FileRoutesById {
   '/api/public/run-reminders': typeof ApiPublicRunRemindersRoute
   '/app/inbox/$conversationId': typeof AppInboxConversationIdRoute
   '/api/public/at/webhook': typeof ApiPublicAtWebhookRoute
-  '/api/public/gateway/webhook': typeof ApiPublicGatewayWebhookRoute
+  '/api/public/gateway/webhook': typeof ApiPublicGatewayWebhookRouteWithChildren
   '/api/public/mpesa/webhook': typeof ApiPublicMpesaWebhookRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/gateway/webhook/$token': typeof ApiPublicGatewayWebhookTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/api/public/gateway/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
+    | '/api/public/gateway/webhook/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/api/public/gateway/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
+    | '/api/public/gateway/webhook/$token'
   id:
     | '__root__'
     | '/'
@@ -374,6 +386,7 @@ export interface FileRouteTypes {
     | '/api/public/gateway/webhook'
     | '/api/public/mpesa/webhook'
     | '/api/public/whatsapp/webhook'
+    | '/api/public/gateway/webhook/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -384,7 +397,7 @@ export interface RootRouteChildren {
   ApiPublicRunAutomationsRoute: typeof ApiPublicRunAutomationsRoute
   ApiPublicRunRemindersRoute: typeof ApiPublicRunRemindersRoute
   ApiPublicAtWebhookRoute: typeof ApiPublicAtWebhookRoute
-  ApiPublicGatewayWebhookRoute: typeof ApiPublicGatewayWebhookRoute
+  ApiPublicGatewayWebhookRoute: typeof ApiPublicGatewayWebhookRouteWithChildren
   ApiPublicMpesaWebhookRoute: typeof ApiPublicMpesaWebhookRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
@@ -594,6 +607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/gateway/webhook/$token': {
+      id: '/api/public/gateway/webhook/$token'
+      path: '/$token'
+      fullPath: '/api/public/gateway/webhook/$token'
+      preLoaderRoute: typeof ApiPublicGatewayWebhookTokenRouteImport
+      parentRoute: typeof ApiPublicGatewayWebhookRoute
+    }
   }
 }
 
@@ -653,6 +673,20 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface ApiPublicGatewayWebhookRouteChildren {
+  ApiPublicGatewayWebhookTokenRoute: typeof ApiPublicGatewayWebhookTokenRoute
+}
+
+const ApiPublicGatewayWebhookRouteChildren: ApiPublicGatewayWebhookRouteChildren =
+  {
+    ApiPublicGatewayWebhookTokenRoute: ApiPublicGatewayWebhookTokenRoute,
+  }
+
+const ApiPublicGatewayWebhookRouteWithChildren =
+  ApiPublicGatewayWebhookRoute._addFileChildren(
+    ApiPublicGatewayWebhookRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
@@ -661,7 +695,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicRunAutomationsRoute: ApiPublicRunAutomationsRoute,
   ApiPublicRunRemindersRoute: ApiPublicRunRemindersRoute,
   ApiPublicAtWebhookRoute: ApiPublicAtWebhookRoute,
-  ApiPublicGatewayWebhookRoute: ApiPublicGatewayWebhookRoute,
+  ApiPublicGatewayWebhookRoute: ApiPublicGatewayWebhookRouteWithChildren,
   ApiPublicMpesaWebhookRoute: ApiPublicMpesaWebhookRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
