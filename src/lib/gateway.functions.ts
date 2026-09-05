@@ -30,6 +30,8 @@ export type GatewayStatus = {
   business_name: string | null;
   whatsapp_connected: boolean;
   webhook_url: string | null;
+  webhook_token: string | null;
+  webhook_secret_source: "auto" | "manual" | null;
   webhook_registered: boolean;
   is_active: boolean;
   messaging_provider: "meta" | "gateway";
@@ -54,6 +56,9 @@ export const getGatewayStatus = createServerFn({ method: "GET" })
         business_name: settings?.business_name ?? null,
         whatsapp_connected: settings?.whatsapp_connected ?? false,
         webhook_url: settings?.webhook_url ?? null,
+        webhook_token: settings?.webhook_token ?? null,
+        webhook_secret_source:
+          settings?.webhook_secret_source === "manual" ? "manual" : settings ? "auto" : null,
         webhook_registered: Boolean(settings?.webhook_secret),
         is_active: settings?.is_active ?? false,
         messaging_provider: bizRow?.messaging_provider === "gateway" ? "gateway" : "meta",
@@ -94,19 +99,31 @@ export const connectGateway = createServerFn({ method: "POST" })
     const businessName: string | null = info?.business?.name ?? info?.name ?? null;
     const whatsappConnected = Boolean(info?.whatsapp?.connected);
 
-    // 2. Register our receiving webhook (non-fatal)
-    const webhookUrl = `${normalizeBaseUrl(data.appUrl)}/api/public/gateway/webhook`;
-    let webhookSecret: string | null = existing?.webhook_secret ?? null;
+    // 2. Register our receiving webhook (non-fatal). Each workspace has its own
+    // token, so several accounts can point at this app without any mix-up.
+    const webhookToken = existing?.webhook_token || crypto.randomUUID().replace(/-/g, "");
+    const webhookUrl = `${normalizeBaseUrl(data.appUrl)}/api/public/gateway/webhook/${webhookToken}`;
+    let webhookSecret: string | null =
+      existing?.webhook_secret_source === "manual" ? existing.webhook_secret : null;
+    let secretSource: "auto" | "manual" = existing?.webhook_secret_source === "manual" ? "manual" : "auto";
     let webhookWarning: string | null = null;
-    const reg = await gatewayFetch<{ webhookSecret?: string }>({
+    const reg = await gatewayFetch<any>({
       baseUrl,
       apiKey,
       path: "/api/v1/webhooks/register",
       method: "POST",
       body: { url: webhookUrl },
     });
-    if (reg.ok && reg.data?.webhookSecret) {
-      webhookSecret = reg.data.webhookSecret;
+    const returnedSecret: string | null =
+      reg.data?.webhookSecret ??
+      reg.data?.secret ??
+      reg.data?.webhook_secret ??
+      reg.data?.data?.webhookSecret ??
+      reg.data?.data?.secret ??
+      null;
+    if (reg.ok && returnedSecret) {
+      webhookSecret = returnedSecret;
+      secretSource = "auto";
     } else if (reg.ok) {
       webhookWarning = "Webhook registered but the gateway returned no secret — inbound messages can't be verified yet.";
     } else {
@@ -124,7 +141,9 @@ export const connectGateway = createServerFn({ method: "POST" })
           base_url: baseUrl,
           api_key: (await encryptSecret(apiKey)) ?? apiKey,
           webhook_secret: webhookSecret ? ((await encryptSecret(webhookSecret)) ?? webhookSecret) : null,
-          webhook_url: webhookSecret ? webhookUrl : (existing?.webhook_url ?? null),
+          webhook_url: webhookUrl,
+          webhook_token: webhookToken,
+          webhook_secret_source: secretSource,
           webhook_registered_at: webhookSecret ? new Date().toISOString() : existing?.webhook_registered_at ?? null,
           business_name: businessName,
           whatsapp_connected: whatsappConnected,
@@ -152,6 +171,36 @@ export const connectGateway = createServerFn({ method: "POST" })
       webhookUrl,
       webhookWarning,
     };
+  });
+
+/** Manual fallback: paste the signing secret shown in the gateway dashboard. */
+export const saveGatewayWebhookSecret = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ secret: z.string().trim().min(8).max(500) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const biz = await currentBusiness(context.supabase);
+    const existing = await loadGatewaySettings(biz.id);
+    if (!existing) throw new Error("Connect the gateway first.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("gateway_settings")
+      .update({
+        webhook_secret: (await encryptSecret(data.secret)) ?? data.secret,
+        webhook_secret_source: "manual",
+        webhook_registered_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("business_id", biz.id);
+    if (error) throw new Error(error.message);
+    await writeAudit({
+      businessId: biz.id,
+      actorId: context.userId,
+      action: "gateway.webhook_secret_saved",
+      targetType: "gateway_settings",
+      targetId: biz.id,
+      detail: { source: "manual" },
+    });
+    return { ok: true };
   });
 
 export const disconnectGateway = createServerFn({ method: "POST" })

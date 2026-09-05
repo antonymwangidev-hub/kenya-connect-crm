@@ -13,6 +13,8 @@ export type GatewaySettings = {
   api_key: string;
   webhook_secret: string | null;
   webhook_url: string | null;
+  webhook_token: string;
+  webhook_secret_source: string;
   webhook_registered_at: string | null;
   business_name: string | null;
   whatsapp_connected: boolean;

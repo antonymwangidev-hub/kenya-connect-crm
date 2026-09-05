@@ -11,6 +11,7 @@ import {
   connectGateway,
   disconnectGateway,
   setMessagingProvider,
+  saveGatewayWebhookSecret,
   type GatewayStatus,
 } from "@/lib/gateway.functions";
 
@@ -19,11 +20,13 @@ export function GatewaySection() {
   const connect = useServerFn(connectGateway);
   const disconnect = useServerFn(disconnectGateway);
   const setProvider = useServerFn(setMessagingProvider);
+  const saveSecret = useServerFn(saveGatewayWebhookSecret);
 
   const [status, setStatus] = useState<GatewayStatus | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState(false);
+  const [webhookSecret, setWebhookSecret] = useState("");
 
   useEffect(() => {
     loadStatus()
@@ -88,9 +91,29 @@ export function GatewaySection() {
     }
   };
 
+  const onSaveSecret = async () => {
+    if (!webhookSecret.trim()) {
+      toast.error("Paste the signing secret from your gateway dashboard");
+      return;
+    }
+    setBusy(true);
+    try {
+      await saveSecret({ data: { secret: webhookSecret.trim() } });
+      setWebhookSecret("");
+      toast.success("Signing secret saved — inbound replies will now be accepted.");
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save the secret");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const manualWebhookUrl =
     status?.webhook_url ??
-    (typeof window !== "undefined" ? `${window.location.origin}/api/public/gateway/webhook` : "/api/public/gateway/webhook");
+    (typeof window !== "undefined" && status?.webhook_token
+      ? `${window.location.origin}/api/public/gateway/webhook/${status.webhook_token}`
+      : "/api/public/gateway/webhook");
 
   return (
     <section className="space-y-4 rounded-2xl border bg-card p-5">
@@ -152,47 +175,56 @@ export function GatewaySection() {
             </div>
           </div>
 
-          {status.webhook_url ? (
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 p-2">
-              <span className="truncate">Receiving webhook: {status.webhook_url}</span>
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-2">
+            <div className="flex items-center gap-2">
+              <span className="truncate font-mono">{manualWebhookUrl}</span>
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  navigator.clipboard.writeText(status.webhook_url ?? "");
-                  toast.success("Copied");
+                  navigator.clipboard.writeText(manualWebhookUrl);
+                  toast.success("Webhook URL copied");
                 }}
               >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
+            <p className="text-muted-foreground">
+              This receiving address belongs to this workspace only — every account you connect gets its own
+              address and its own signing secret.
+            </p>
+          </div>
+
+          {status.webhook_registered ? (
+            <div className="flex items-center gap-2 text-emerald-600">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Receiving is active ({status.webhook_secret_source === "manual" ? "secret entered manually" : "set up automatically"}).
+            </div>
           ) : (
-            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-amber-700">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>
-                  Automatic webhook registration did not complete. Register this URL manually in your gateway
-                  dashboard, then save the signing secret it gives you as the project secret{" "}
-                  <code className="font-mono">GATEWAY_WEBHOOK_SECRET</code> — inbound replies will start working.
-                </span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border bg-background/60 p-2 text-foreground">
-                <span className="truncate font-mono">{manualWebhookUrl}</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    navigator.clipboard.writeText(manualWebhookUrl);
-                    toast.success("Webhook URL copied");
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-amber-700">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Automatic setup did not complete. Register the address above in your gateway dashboard, then paste
+                the signing secret it gives you below.
+              </span>
             </div>
           )}
+
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[220px] flex-1">
+              <Label>Webhook signing secret</Label>
+              <Input
+                type="password"
+                placeholder={status.webhook_registered ? "Stored — paste a new one to replace" : "Paste the secret from your gateway"}
+                value={webhookSecret}
+                onChange={(e) => setWebhookSecret(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" onClick={onSaveSecret} disabled={busy}>
+              Save secret
+            </Button>
+          </div>
 
           <div className="flex items-start justify-between gap-4 rounded-xl border bg-muted/30 p-3">
             <div>
