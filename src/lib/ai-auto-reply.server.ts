@@ -96,13 +96,21 @@ async function callLovableAI(system: string, history: { role: "user" | "assistan
   return (j.choices?.[0]?.message?.content ?? "").trim();
 }
 
-export async function maybeAutoReply(opts: {
+export type AiReplyResult = { sent: boolean; reason?: string };
+
+/**
+ * Generates and sends one AI reply for a specific inbound message.
+ * Throws on transient failures so the queue can retry; returns
+ * { sent: false, reason } for permanent "nothing to do" cases.
+ */
+export async function generateAndSendAiReply(opts: {
   businessId: string;
   contactId: string;
-  conversationId: string;
+  conversationId: string | null;
   toPhone: string;
-}) {
-  try {
+  inboundContent?: string | null;
+}): Promise<AiReplyResult> {
+  {
     const { data: settings } = await supabaseAdmin
       .from("ai_assistant_settings")
       .select("*")
@@ -110,7 +118,7 @@ export async function maybeAutoReply(opts: {
       .maybeSingle();
     if (!settings || !settings.enabled) {
       console.log("[AI reply] skipped (disabled)", { businessId: opts.businessId });
-      return;
+      return { sent: false, reason: "assistant disabled" };
     }
 
     const { data: biz } = await supabaseAdmin
@@ -130,9 +138,15 @@ export async function maybeAutoReply(opts: {
         role: (m.direction === "inbound" ? "user" : "assistant") as "user" | "assistant",
         content: m.content,
       }));
+    // The queue answers each inbound message individually, so a later reply
+    // may already sit at the tail. Re-anchor on the message this job is for.
+    const inbound = (opts.inboundContent ?? "").trim();
+    if (inbound && history[history.length - 1]?.content !== inbound) {
+      history.push({ role: "user", content: inbound });
+    }
     if (history.length === 0 || history[history.length - 1].role !== "user") {
       console.log("[AI reply] skipped (no inbound tail)", { contactId: opts.contactId });
-      return;
+      return { sent: false, reason: "no inbound message to answer" };
     }
 
     const { data: kbRows } = await supabaseAdmin
@@ -157,21 +171,20 @@ export async function maybeAutoReply(opts: {
     const reply = await callLovableAI(system, history);
     if (!reply) {
       console.log("[AI reply] empty response");
-      return;
+      return { sent: false, reason: "model returned an empty reply" };
     }
 
     await sendTextViaProvider(opts.businessId, opts.toPhone, reply);
 
     const { error: insErr } = await supabaseAdmin.from("messages").insert({
       contact_id: opts.contactId,
-      conversation_id: opts.conversationId,
+      conversation_id: opts.conversationId ?? null,
       direction: "outbound",
       content: reply,
       channel: "whatsapp",
     });
     if (insErr) console.warn("[AI reply] insert failed", insErr.message);
     else console.log("[AI reply] sent", { businessId: opts.businessId, contactId: opts.contactId, len: reply.length });
-  } catch (err) {
-    console.error("[AI reply] failed", err instanceof Error ? err.message : err);
+    return { sent: true };
   }
 }
