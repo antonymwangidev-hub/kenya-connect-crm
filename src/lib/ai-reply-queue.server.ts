@@ -120,12 +120,11 @@ export async function processAiReplyQueue(opts: { businessId?: string; contactId
         .from("ai_reply_jobs")
         .update({
           status: result.sent ? "done" : "skipped",
-          detail: null,
           error: result.sent ? null : result.reason,
           processed_at: new Date().toISOString(),
           attempts: job.attempts + 1,
           locked_at: null,
-        } as never)
+        })
         .eq("id", job.id);
       if (result.sent) sent++;
     } catch (err) {
