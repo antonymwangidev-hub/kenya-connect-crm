@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendTextViaProvider } from "@/lib/messaging.functions";
+import { gatewaySendTyping, getMessagingProvider } from "@/lib/gateway.server";
 
 type AiRow = {
   enabled: boolean;
