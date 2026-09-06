@@ -120,6 +120,60 @@ export type Database = {
           },
         ]
       }
+      ai_reply_jobs: {
+        Row: {
+          attempts: number
+          business_id: string
+          contact_id: string
+          conversation_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          inbound_content: string | null
+          locked_at: string | null
+          message_id: string | null
+          processed_at: string | null
+          run_after: string
+          status: string
+          to_phone: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          business_id: string
+          contact_id: string
+          conversation_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          inbound_content?: string | null
+          locked_at?: string | null
+          message_id?: string | null
+          processed_at?: string | null
+          run_after?: string
+          status?: string
+          to_phone: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          business_id?: string
+          contact_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          inbound_content?: string | null
+          locked_at?: string | null
+          message_id?: string | null
+          processed_at?: string | null
+          run_after?: string
+          status?: string
+          to_phone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
