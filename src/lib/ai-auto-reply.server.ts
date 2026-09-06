@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendTextViaProvider } from "@/lib/messaging.functions";
+import { gatewaySendTyping, getMessagingProvider } from "@/lib/gateway.server";
 
 type AiRow = {
   enabled: boolean;
@@ -117,7 +118,7 @@ export async function maybeAutoReply(opts: {
 
     const { data: msgs } = await supabaseAdmin
       .from("messages")
-      .select("direction,content,created_at")
+      .select("direction,content,channel,created_at")
       .eq("contact_id", opts.contactId)
       .order("created_at", { ascending: false })
       .limit(12);
@@ -144,6 +145,15 @@ export async function maybeAutoReply(opts: {
     const kb = (kbRows ?? []).filter((k) => (k.content ?? "").trim().length > 0) as KbEntry[];
 
     const system = buildSystemPrompt(biz?.name ?? "the business", settings as AiRow, kb);
+
+    // Show a real gateway typing indicator while the AI composes its reply.
+    // Fire-and-forget: never block or fail the reply if the indicator call fails.
+    const provider = await getMessagingProvider(opts.businessId);
+    const lastInboundChannel = (msgs ?? []).find((m) => m.direction === "inbound")?.channel ?? "whatsapp";
+    if (provider === "gateway" && lastInboundChannel === "whatsapp") {
+      gatewaySendTyping(opts.businessId, opts.toPhone).catch(() => {});
+    }
+
     const reply = await callLovableAI(system, history);
     if (!reply) {
       console.log("[AI reply] empty response");
