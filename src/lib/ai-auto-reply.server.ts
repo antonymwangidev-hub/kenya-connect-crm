@@ -145,6 +145,15 @@ export async function maybeAutoReply(opts: {
     const kb = (kbRows ?? []).filter((k) => (k.content ?? "").trim().length > 0) as KbEntry[];
 
     const system = buildSystemPrompt(biz?.name ?? "the business", settings as AiRow, kb);
+
+    // Show a real gateway typing indicator while the AI composes its reply.
+    // Fire-and-forget: never block or fail the reply if the indicator call fails.
+    const provider = await getMessagingProvider(opts.businessId);
+    const lastInboundChannel = (msgs ?? []).find((m) => m.direction === "inbound")?.channel ?? "whatsapp";
+    if (provider === "gateway" && lastInboundChannel === "whatsapp") {
+      gatewaySendTyping(opts.businessId, opts.toPhone).catch(() => {});
+    }
+
     const reply = await callLovableAI(system, history);
     if (!reply) {
       console.log("[AI reply] empty response");
