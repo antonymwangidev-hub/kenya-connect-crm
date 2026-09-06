@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
-import { maybeAutoReply } from "@/lib/ai-auto-reply.server";
+import { enqueueAiReply, processAiReplyQueue } from "@/lib/ai-reply-queue.server";
 import { decryptSecret } from "@/lib/crypto.server";
 import { toE164 } from "@/lib/gateway.server";
 
@@ -212,29 +212,35 @@ export async function handleGatewayWebhook(request: Request, token: string | nul
         }
       }
 
-      const { error: insErr } = await supabaseAdmin.from("messages").insert({
-        contact_id: contact.id,
-        conversation_id: conversation?.id ?? null,
-        direction: "inbound",
-        content: body,
-        channel,
-        provider_message_id: providerId,
-        created_at: payload.receivedAt ?? new Date().toISOString(),
-      });
+      const { data: insertedInbound, error: insErr } = await supabaseAdmin
+        .from("messages")
+        .insert({
+          contact_id: contact.id,
+          conversation_id: conversation?.id ?? null,
+          direction: "inbound",
+          content: body,
+          channel,
+          provider_message_id: providerId,
+          created_at: payload.receivedAt ?? new Date().toISOString(),
+        })
+        .select("id")
+        .single();
       if (insErr) throw insErr;
       await logEvent(businessId, payload);
 
-      if (conversation?.id) {
-        try {
-          await maybeAutoReply({
-            businessId,
-            contactId: contact.id,
-            conversationId: conversation.id,
-            toPhone: phone,
-          });
-        } catch (aiErr) {
-          console.error("[Gateway webhook] AI reply failed", aiErr);
-        }
+      // Queue the reply so a burst of messages each gets answered, in order.
+      try {
+        await enqueueAiReply({
+          businessId,
+          contactId: contact.id,
+          conversationId: conversation?.id ?? null,
+          messageId: insertedInbound?.id ?? null,
+          toPhone: phone,
+          content: body,
+        });
+        await processAiReplyQueue({ businessId, contactId: contact.id, limit: 5 });
+      } catch (aiErr) {
+        console.error("[Gateway webhook] AI reply queue failed", aiErr);
       }
       return new Response("ok", { status: 200 });
     }

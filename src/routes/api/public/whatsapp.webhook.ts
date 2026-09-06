@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
-import { maybeAutoReply } from "@/lib/ai-auto-reply.server";
+import { enqueueAiReply, processAiReplyQueue } from "@/lib/ai-reply-queue.server";
 import { decryptSecret } from "@/lib/crypto.server";
 
 // Meta WhatsApp Cloud API webhook.
@@ -549,16 +549,20 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
 
                     await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
 
-                    // Fire AI auto-reply (no-op if disabled for this business).
+                    // Queue the AI reply (no-op if disabled for this business)
+                    // so every inbound message is answered, even in bursts.
                     try {
-                      await maybeAutoReply({
+                      await enqueueAiReply({
                         businessId,
                         contactId: contact.id,
                         conversationId: conversation.id,
+                        messageId: inserted?.id ?? null,
                         toPhone: phone,
+                        content: text,
                       });
+                      await processAiReplyQueue({ businessId, contactId: contact.id, limit: 5 });
                     } catch (aiErr) {
-                      console.error("[WA webhook] AI reply failed", aiErr);
+                      console.error("[WA webhook] AI reply queue failed", aiErr);
                     }
                   } catch (messageError) {
                     const message = errorMessage(messageError);
