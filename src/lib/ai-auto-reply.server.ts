@@ -118,7 +118,7 @@ export async function maybeAutoReply(opts: {
 
     const { data: msgs } = await supabaseAdmin
       .from("messages")
-      .select("direction,content,created_at")
+      .select("direction,content,channel,created_at")
       .eq("contact_id", opts.contactId)
       .order("created_at", { ascending: false })
       .limit(12);
