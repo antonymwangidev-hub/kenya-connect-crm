@@ -300,17 +300,27 @@ export const saveContactConsent = createServerFn({ method: "POST" })
     const phone = toE164(contact.phone);
     if (!isE164(phone)) throw new Error("Contact phone must be in E.164 format, e.g. +254712345678");
 
+    // Save locally first so a temporary gateway/network hiccup (e.g. a 1016
+    // origin error page) can never lose the consent the user just recorded.
     let synced: string | null = null;
+    let warning: string | null = null;
     const settings = await loadGatewaySettings(contact.business_id);
     if (settings) {
-      await gatewayUpsertContact({
-        businessId: contact.business_id,
-        phone,
-        displayName: contact.name,
-        optIn: data.optIn,
-        optInSource: data.optInSource || "not specified",
-      });
-      synced = new Date().toISOString();
+      for (let attempt = 0; attempt < 3 && !synced; attempt++) {
+        try {
+          await gatewayUpsertContact({
+            businessId: contact.business_id,
+            phone,
+            displayName: contact.name,
+            optIn: data.optIn,
+            optInSource: data.optInSource || "not specified",
+          });
+          synced = new Date().toISOString();
+        } catch (err) {
+          warning = err instanceof Error ? err.message : String(err);
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        }
+      }
     }
 
     const { error: updErr } = await supabase
@@ -323,8 +333,9 @@ export const saveContactConsent = createServerFn({ method: "POST" })
       })
       .eq("id", contact.id);
     if (updErr) throw new Error(updErr.message);
-    return { ok: true, synced: Boolean(synced) };
+    return { ok: true, synced: Boolean(synced), warning: synced ? null : warning };
   });
+
 
 export const listUnmatchedGatewayMessages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
