@@ -270,12 +270,19 @@ async function upsertContact(businessId: string, phone: string, name: string | n
   }
   const { data: created, error } = await supabaseAdmin
     .from("contacts")
-    .insert({ business_id: businessId, phone, name: name ?? phone })
+    .insert({
+      business_id: businessId,
+      phone,
+      name: name ?? phone,
+      opt_in: true,
+      opt_in_source: "Customer messaged us first on WhatsApp",
+    })
     .select("id,phone")
     .single();
   if (error) throw error;
   return { id: created.id, created: true, phone: created.phone, matchedPhone: created.phone };
 }
+
 
 async function getOrCreateConversation(businessId: string, contactId: string) {
   const { data: existing, error: existingError } = await supabaseAdmin

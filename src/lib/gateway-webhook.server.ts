@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 import { enqueueAiReply, processAiReplyQueue } from "@/lib/ai-reply-queue.server";
 import { decryptSecret } from "@/lib/crypto.server";
-import { toE164 } from "@/lib/gateway.server";
+import { toE164, isE164, gatewayUpsertContact } from "@/lib/gateway.server";
 
 // Nexus WhatsApp Gateway receiving endpoint (multi-tenant).
 // Each connected workspace gets its own URL:
@@ -183,19 +183,64 @@ export async function handleGatewayWebhook(request: Request, token: string | nul
       const providerId: string | null = payload.providerMessageId ?? null;
       const channel = payload.channel === "sms" ? "sms" : "whatsapp";
 
-      const contact = await findContact(businessId, phone);
+      // A brand-new number messaging us first: save the contact with consent
+      // already on, so the team (and the AI) can reply straight away.
+      let contact = await findContact(businessId, phone);
       if (!contact) {
-        await supabaseAdmin.from("gateway_unmatched_messages").insert({
-          business_id: businessId,
-          phone,
-          channel,
-          body,
-          provider_message_id: providerId,
-          payload: payload as never,
-        });
-        await logEvent(businessId, { ...payload, unmatched: true });
-        return new Response("ok", { status: 200 });
+        if (!isE164(phone)) {
+          await supabaseAdmin.from("gateway_unmatched_messages").insert({
+            business_id: businessId,
+            phone,
+            channel,
+            body,
+            provider_message_id: providerId,
+            payload: payload as never,
+          });
+          await logEvent(businessId, { ...payload, unmatched: true });
+          return new Response("ok", { status: 200 });
+        }
+        const optInSource = "Customer messaged us first on WhatsApp";
+        const { data: created, error: createErr } = await supabaseAdmin
+          .from("contacts")
+          .insert({
+            business_id: businessId,
+            phone,
+            name: String(payload.profileName ?? payload.name ?? phone),
+            opt_in: true,
+            opt_in_source: optInSource,
+          })
+          .select("id,phone")
+          .single();
+        if (createErr || !created) {
+          await supabaseAdmin.from("gateway_unmatched_messages").insert({
+            business_id: businessId,
+            phone,
+            channel,
+            body,
+            provider_message_id: providerId,
+            payload: payload as never,
+          });
+          await logEvent(businessId, { ...payload, unmatched: true }, createErr?.message);
+          return new Response("ok", { status: 200 });
+        }
+        contact = created;
+        try {
+          await gatewayUpsertContact({
+            businessId,
+            phone,
+            displayName: created.phone,
+            optIn: true,
+            optInSource,
+          });
+          await supabaseAdmin
+            .from("contacts")
+            .update({ gateway_synced_at: new Date().toISOString() })
+            .eq("id", created.id);
+        } catch (consentErr) {
+          console.warn("[Gateway webhook] consent sync failed", consentErr);
+        }
       }
+
 
       const conversation = await getOrCreateConversation(businessId, contact.id);
 
