@@ -82,10 +82,14 @@ export function EditContactDialog({ open, onOpenChange, contact, onSaved }: Prop
       const consentChanged =
         optIn !== Boolean(contact.opt_in) || source !== (contact.opt_in_source ?? "");
       if (consentChanged) {
-        await saveConsent({ data: { contactId: contact.id, optIn, optInSource: source } });
+        const res = await saveConsent({ data: { contactId: contact.id, optIn, optInSource: source } });
         setOptInSource(source);
+        if (res && (res as { warning?: string | null }).warning) {
+          toast.warning("Consent saved here, but the messaging service could not be reached just now. It will be retried.");
+        }
       }
       toast.success("Contact updated");
+
       onSaved?.({ ...(updated as EditableContact), opt_in: optIn, opt_in_source: source || null });
 
       onOpenChange(false);
