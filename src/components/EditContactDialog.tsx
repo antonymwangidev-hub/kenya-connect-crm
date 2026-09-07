@@ -78,17 +78,16 @@ export function EditContactDialog({ open, onOpenChange, contact, onSaved }: Prop
     setSaving(true);
     try {
       const updated = await update({ data: { id: contact.id, name, phone, email, notes, avatar_url: avatarUrl ?? "" } });
+      const source = optIn ? (optInSource.trim() || "Confirmed by team in CRM") : "";
       const consentChanged =
-        optIn !== Boolean(contact.opt_in) || (optInSource ?? "") !== (contact.opt_in_source ?? "");
+        optIn !== Boolean(contact.opt_in) || source !== (contact.opt_in_source ?? "");
       if (consentChanged) {
-        try {
-          await saveConsent({ data: { contactId: contact.id, optIn, optInSource } });
-        } catch (err) {
-          toast.warning(err instanceof Error ? err.message : "Consent could not be saved");
-        }
+        await saveConsent({ data: { contactId: contact.id, optIn, optInSource: source } });
+        setOptInSource(source);
       }
       toast.success("Contact updated");
-      onSaved?.({ ...(updated as EditableContact), opt_in: optIn, opt_in_source: optInSource || null });
+      onSaved?.({ ...(updated as EditableContact), opt_in: optIn, opt_in_source: source || null });
+
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
