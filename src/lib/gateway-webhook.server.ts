@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
 import { enqueueAiReply, processAiReplyQueue } from "@/lib/ai-reply-queue.server";
 import { decryptSecret } from "@/lib/crypto.server";
-import { toE164 } from "@/lib/gateway.server";
+import { toE164, isE164, gatewayUpsertContact } from "@/lib/gateway.server";
 
 // Nexus WhatsApp Gateway receiving endpoint (multi-tenant).
 // Each connected workspace gets its own URL:
