@@ -29,6 +29,8 @@ type Contact = {
   email: string | null;
   notes: string | null;
   avatar_url: string | null;
+  opt_in: boolean | null;
+  opt_in_source: string | null;
   created_at: string;
   tags: Tag[];
 };
@@ -55,20 +57,22 @@ function ContactsPage() {
     const [{ data: cdata, error: cerr }, { data: tdata, error: terr }] = await Promise.all([
       supabase
         .from("contacts")
-        .select("id,name,phone,email,notes,avatar_url,created_at,contact_tags(tag:tags(id,name))")
+        .select("id,name,phone,email,notes,avatar_url,opt_in,opt_in_source,created_at,contact_tags(tag:tags(id,name))")
         .eq("business_id", businessId)
         .order("created_at", { ascending: false }),
       supabase.from("tags").select("id,name").eq("business_id", businessId).order("name"),
     ]);
     if (cerr) toast.error(cerr.message);
     if (terr) toast.error(terr.message);
-    const mapped: Contact[] = (cdata ?? []).map((c: { id: string; name: string; phone: string; email: string | null; notes: string | null; avatar_url: string | null; created_at: string; contact_tags: { tag: Tag | null }[] }) => ({
+    const mapped: Contact[] = (cdata ?? []).map((c: { id: string; name: string; phone: string; email: string | null; notes: string | null; avatar_url: string | null; opt_in: boolean | null; opt_in_source: string | null; created_at: string; contact_tags: { tag: Tag | null }[] }) => ({
       id: c.id,
       name: c.name,
       phone: c.phone,
       email: c.email,
       notes: c.notes,
       avatar_url: c.avatar_url,
+      opt_in: c.opt_in,
+      opt_in_source: c.opt_in_source,
       created_at: c.created_at,
       tags: (c.contact_tags ?? []).map((ct) => ct.tag).filter((t): t is Tag => Boolean(t)),
     }));
@@ -201,7 +205,7 @@ function ContactsPage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
                     <button
-                      onClick={() => setEditing({ id: c.id, name: c.name, phone: c.phone, email: c.email, notes: c.notes, avatar_url: c.avatar_url })}
+                      onClick={() => setEditing({ id: c.id, name: c.name, phone: c.phone, email: c.email, notes: c.notes, avatar_url: c.avatar_url, opt_in: c.opt_in, opt_in_source: c.opt_in_source })}
                       className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                       title="Edit contact"
                     >
@@ -239,7 +243,7 @@ function ContactsPage() {
         onOpenChange={(v) => { if (!v) setEditing(null); }}
         contact={editing}
         onSaved={(u) => {
-          setContacts((prev) => prev.map((c) => c.id === u.id ? { ...c, name: u.name, phone: u.phone, email: u.email ?? null, notes: u.notes ?? null, avatar_url: u.avatar_url ?? null } : c));
+          setContacts((prev) => prev.map((c) => c.id === u.id ? { ...c, name: u.name, phone: u.phone, email: u.email ?? null, notes: u.notes ?? null, avatar_url: u.avatar_url ?? null, opt_in: u.opt_in ?? false, opt_in_source: u.opt_in_source ?? null } : c));
           setEditing(null);
         }}
       />
