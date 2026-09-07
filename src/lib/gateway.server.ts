@@ -25,12 +25,20 @@ export function normalizeBaseUrl(url: string) {
   return url.trim().replace(/\/+$/, "");
 }
 
+/** Normalise to E.164, defaulting bare local numbers to Kenya (+254). */
 export function toE164(phone: string) {
   const trimmed = String(phone ?? "").trim();
   if (trimmed.startsWith("+")) return `+${trimmed.slice(1).replace(/\D/g, "")}`;
-  const digits = trimmed.replace(/\D/g, "");
-  return digits ? `+${digits}` : "";
+  let digits = trimmed.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("254")) return `+${digits}`;
+  if (digits.startsWith("0")) return `+254${digits.replace(/^0+/, "")}`;
+  // Bare Kenyan subscriber number, e.g. 712345678 / 112345678
+  if (digits.length === 9 && /^[17]/.test(digits)) return `+254${digits}`;
+  return `+${digits}`;
 }
+
 
 export function isE164(phone: string) {
   return /^\+[1-9]\d{6,14}$/.test(phone);
