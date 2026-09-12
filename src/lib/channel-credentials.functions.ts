@@ -110,9 +110,15 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
       .single();
     if (bizErr || !biz) throw new Error("Business not found");
 
-    // Read existing creds (RLS scopes to owner)
-    const { data: existing } = await (await sbAdmin())
-      .from("channel_credentials")
+    const { data: canWrite, error: permissionError } = await supabase.rpc("can_write_business", {
+      _business_id: biz.id,
+    });
+    if (permissionError || !canWrite) throw new Error("You cannot change channel settings");
+
+    const admin = await sbAdmin();
+
+    // Secrets are written with the privileged client after the user permission check above.
+    const { data: existing } = await admin.from("channel_credentials")
       .select("credentials, is_active")
       .eq("business_id", biz.id)
       .eq("provider", data.provider)
@@ -139,7 +145,7 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
 
     const stored = await encryptFields(merged, SECRET_FIELDS[data.provider] ?? []);
 
-    const { error } = await supabase
+    const { error } = await admin
       .from("channel_credentials")
       .upsert(
         {
@@ -160,8 +166,11 @@ export const upsertChannelCredentials = createServerFn({ method: "POST" })
       const accessToken = (merged.access_token ?? "").trim();
       if (wabaId && phoneNumberId) {
         const { data: bizRow } = await supabase
-          .from("businesses").select("name").eq("id", biz.id).maybeSingle();
-        await supabase.from("whatsapp_business_accounts").upsert(
+          .from("businesses")
+          .select("name")
+          .eq("id", biz.id)
+          .maybeSingle();
+        await admin.from("whatsapp_business_accounts").upsert(
           {
             business_id: biz.id,
             waba_id: wabaId,
