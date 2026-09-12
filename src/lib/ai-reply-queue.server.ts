@@ -105,6 +105,27 @@ export async function processAiReplyQueue(opts: { businessId?: string; contactId
 
     const job = await claim(row.id);
     if (!job) continue;
+
+    // Two webhook requests can claim different jobs for the same contact at
+    // the same time. Let only the oldest claimed job run; release newer jobs
+    // so they are picked up after the current reply finishes.
+    const { data: oldestProcessing } = await supabaseAdmin
+      .from("ai_reply_jobs")
+      .select("id")
+      .eq("contact_id", job.contact_id)
+      .eq("status", "processing")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (oldestProcessing?.id !== job.id) {
+      await supabaseAdmin
+        .from("ai_reply_jobs")
+        .update({ status: "pending", locked_at: null })
+        .eq("id", job.id)
+        .eq("status", "processing");
+      continue;
+    }
+
     busyContacts.add(job.contact_id);
     processed++;
 

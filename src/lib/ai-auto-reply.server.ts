@@ -56,7 +56,7 @@ function buildSystemPrompt(businessName: string, s: AiRow, kb: KbEntry[]) {
 
   const parts: string[] = [
     `You are the customer support assistant for "${businessName}", chatting with customers on WhatsApp on behalf of the business.`,
-    `Tone: ${tone}. Reply in the same language the customer used. Keep replies short (1-3 sentences, under 500 characters), natural, and free of markdown.`,
+    `Tone: ${tone}. Reply in the same language the customer used. Keep replies to 1-2 short lines, natural and believable, under 280 characters, and free of markdown.`,
     "",
     "=== ANSWERING RULES ===",
     rules,
@@ -77,6 +77,17 @@ function buildSystemPrompt(businessName: string, s: AiRow, kb: KbEntry[]) {
       : "",
   ].filter(Boolean);
   return parts.join("\n");
+}
+
+function keepReplyShort(reply: string): string {
+  const lines = reply
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.replace(/^\s*[-*]\s+/, "").trim())
+    .filter(Boolean)
+    .slice(0, 2);
+  return lines.join("\n").slice(0, 280).trim();
 }
 
 async function callLovableAI(system: string, history: { role: "user" | "assistant"; content: string }[]) {
@@ -168,13 +179,17 @@ export async function generateAndSendAiReply(opts: {
       gatewaySendTyping(opts.businessId, opts.toPhone).catch(() => {});
     }
 
-    const reply = await callLovableAI(system, history);
+    const reply = keepReplyShort(await callLovableAI(system, history));
     if (!reply) {
-      console.log("[AI reply] empty response");
-      return { sent: false, reason: "model returned an empty reply" };
+      throw new Error("model returned an empty reply");
     }
 
     await sendTextViaProvider(opts.businessId, opts.toPhone, reply);
+    console.log("[AI reply] provider accepted reply", {
+      businessId: opts.businessId,
+      contactId: opts.contactId,
+      len: reply.length,
+    });
 
     const { error: insErr } = await supabaseAdmin.from("messages").insert({
       contact_id: opts.contactId,

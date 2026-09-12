@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { processAiReplyQueue } from "./lib/ai-reply-queue.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -125,5 +126,9 @@ export default {
       console.error(error);
       return applySecurityHeaders(brandedErrorResponse());
     }
+  },
+  async scheduled() {
+    const result = await processAiReplyQueue({ limit: 50 });
+    console.log("[AI queue] scheduled run", result);
   },
 };
