@@ -15,6 +15,7 @@
 //   WHATSAPP_APP_SECRET     - from Meta App Dashboard, used to verify X-Hub-Signature-256
 //   WHATSAPP_ACCESS_TOKEN   - Meta Cloud API token used for AI replies
 //   LOVABLE_API_KEY         - key used to generate AI replies
+//   TOKEN_ENCRYPTION_KEY    - application key used to decrypt gateway_settings.api_key
 //
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically by
 // the Supabase Edge Functions runtime — no need to set them manually.
@@ -25,6 +26,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN")!;
 const APP_SECRET = Deno.env.get("WHATSAPP_APP_SECRET") ?? "";
+const MAX_REPLY_ATTEMPTS = 3;
+const REPLY_LEASE_MS = 3 * 60 * 1000;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -128,19 +131,8 @@ Deno.serve(async (req: Request) => {
               try {
                 const stored = await storeInboundMessage(businessId, message, value.contacts ?? [], trace);
                 if (stored) {
-                  try {
-                    trace.ai_reply = await sendAiReply({
-                      ...stored,
-                      businessId,
-                      phoneNumberId: businessLookup.phoneNumberId!,
-                    });
-                  } catch (aiError) {
-                    trace.ai_reply = {
-                      sent: false,
-                      error: aiError instanceof Error ? aiError.message : String(aiError),
-                    };
-                    console.error("WhatsApp AI reply failed:", JSON.stringify(trace), aiError);
-                  }
+                  await enqueueReply(stored, businessId);
+                  trace.ai_reply = { queued: true };
                 }
                 console.info("WhatsApp inbound stored:", JSON.stringify(trace));
                 await logWebhook(trace, signatureOk, null, businessId);
@@ -151,6 +143,8 @@ Deno.serve(async (req: Request) => {
                 await logWebhook(trace, signatureOk, processingError, businessId);
               }
             }
+
+            if (signatureOk && !processingError) runReplyWorkerInBackground();
           }
         }
       }
@@ -263,7 +257,39 @@ type StoredInbound = {
   conversationId: string | null;
   phone: string;
   content: string;
+  messageId: string;
 };
+
+type ReplyJob = {
+  id: string;
+  business_id: string;
+  contact_id: string;
+  conversation_id: string | null;
+  to_phone: string;
+  inbound_content: string | null;
+  attempts: number;
+};
+
+async function decryptSecret(value: string | null | undefined): Promise<string | null> {
+  if (!value) return null;
+  if (!value.startsWith("enc:v1:")) return value;
+  const encryptionKey = Deno.env.get("TOKEN_ENCRYPTION_KEY");
+  if (!encryptionKey) return null;
+  try {
+    const binary = atob(value.slice("enc:v1:".length));
+    const packed = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(encryptionKey));
+    const key = await crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["decrypt"]);
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: packed.slice(0, 12) },
+      key,
+      packed.slice(12),
+    );
+    return new TextDecoder().decode(plain);
+  } catch {
+    return null;
+  }
+}
 
 function shortenReply(value: string): string {
   return value
@@ -345,33 +371,143 @@ async function generateAiReply(businessId: string, contactId: string, inboundCon
   return reply;
 }
 
-async function sendAiReply(opts: StoredInbound & { businessId: string; phoneNumberId: string }) {
-  const reply = await generateAiReply(opts.businessId, opts.contactId, opts.content);
+async function sendAiReply(opts: ReplyJob & { phoneNumberId: string | null }) {
+  const reply = await generateAiReply(opts.business_id, opts.contact_id, opts.inbound_content ?? "");
   if (!reply) return { sent: false, reason: "assistant disabled" };
 
-  const token = Deno.env.get("WHATSAPP_ACCESS_TOKEN")?.trim();
-  if (!token) throw new Error("WHATSAPP_ACCESS_TOKEN missing for Edge Function AI replies");
-  const response = await fetch(`https://graph.facebook.com/v20.0/${opts.phoneNumberId}/messages`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: opts.phone.replace(/^\+/, ""),
-      type: "text",
-      text: { body: reply },
-    }),
-  });
-  if (!response.ok) throw new Error(`WhatsApp API ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("messaging_provider")
+    .eq("id", opts.business_id)
+    .maybeSingle();
+  let providerMessageId: string | null = null;
+
+  if (business?.messaging_provider === "gateway") {
+    const { data: gateway } = await supabase
+      .from("gateway_settings")
+      .select("base_url,api_key,is_active")
+      .eq("business_id", opts.business_id)
+      .maybeSingle();
+    const apiKey = await decryptSecret(gateway?.api_key);
+    if (!gateway?.is_active || !gateway.base_url || !apiKey) {
+      throw new Error("Gateway is not configured for AI replies");
+    }
+    const response = await fetch(`${gateway.base_url.replace(/\/+$/, "")}/api/v1/messages/send`, {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: opts.to_phone,
+        channel: "whatsapp",
+        body: reply,
+      }),
+    });
+    const result = await response.json().catch(() => null) as { data?: { messageId?: string }; messageId?: string; error?: string } | null;
+    if (!response.ok) throw new Error(`Gateway ${response.status}: ${result?.error ?? "send failed"}`);
+    providerMessageId = result?.data?.messageId ?? result?.messageId ?? null;
+  } else {
+    if (!opts.phoneNumberId) throw new Error("WhatsApp phone number ID missing for AI reply");
+    const token = Deno.env.get("WHATSAPP_ACCESS_TOKEN")?.trim();
+    if (!token) throw new Error("WHATSAPP_ACCESS_TOKEN missing for Edge Function AI replies");
+    const response = await fetch(`https://graph.facebook.com/v20.0/${opts.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: opts.to_phone.replace(/^\+/, ""),
+        type: "text",
+        text: { body: reply },
+      }),
+    });
+    const result = await response.json().catch(() => null) as { messages?: Array<{ id?: string }> } | null;
+    if (!response.ok) throw new Error(`WhatsApp API ${response.status}`);
+    providerMessageId = result?.messages?.[0]?.id ?? null;
+  }
 
   const { error } = await supabase.from("messages").insert({
-    contact_id: opts.contactId,
-    conversation_id: opts.conversationId,
+    contact_id: opts.contact_id,
+    conversation_id: opts.conversation_id,
     direction: "outbound",
     content: reply,
     channel: "whatsapp",
+    provider_message_id: providerMessageId,
   });
   if (error) throw error;
   return { sent: true, length: reply.length };
+}
+
+async function enqueueReply(stored: StoredInbound, businessId: string) {
+  const { error } = await supabase.from("ai_reply_jobs").insert({
+    business_id: businessId,
+    contact_id: stored.contactId,
+    conversation_id: stored.conversationId,
+    message_id: stored.messageId,
+    to_phone: stored.phone,
+    inbound_content: stored.content,
+    status: "pending",
+  });
+  if (error && !/duplicate key|unique/i.test(error.message)) throw error;
+}
+
+async function processReplyJobs() {
+  const cutoff = new Date(Date.now() - REPLY_LEASE_MS).toISOString();
+  await supabase.from("ai_reply_jobs").update({ status: "pending", locked_at: null }).eq("status", "processing").lt("locked_at", cutoff);
+  const { data: rows, error } = await supabase
+    .from("ai_reply_jobs")
+    .select("id,business_id,contact_id,conversation_id,to_phone,inbound_content,attempts")
+    .eq("status", "pending")
+    .lte("run_after", new Date().toISOString())
+    .order("created_at", { ascending: true })
+    .limit(10);
+  if (error) throw error;
+
+  for (const row of (rows ?? []) as ReplyJob[]) {
+    const { data: job } = await supabase
+      .from("ai_reply_jobs")
+      .update({ status: "processing", locked_at: new Date().toISOString() })
+      .eq("id", row.id)
+      .eq("status", "pending")
+      .select("id,business_id,contact_id,conversation_id,to_phone,inbound_content,attempts")
+      .maybeSingle();
+    if (!job) continue;
+
+    try {
+      const { data: connection } = await supabase
+        .from("whatsapp_connections")
+        .select("phone_number_id")
+        .eq("business_id", job.business_id)
+        .eq("status", "connected")
+        .not("phone_number_id", "is", null)
+        .order("connected_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const phoneNumberId = connection?.phone_number_id ?? Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? null;
+      const result = await sendAiReply({ ...job, phoneNumberId });
+      await supabase.from("ai_reply_jobs").update({
+        status: result.sent ? "done" : "skipped",
+        error: result.sent ? null : result.reason,
+        processed_at: new Date().toISOString(),
+        locked_at: null,
+        attempts: job.attempts + 1,
+      }).eq("id", job.id);
+    } catch (error) {
+      const attempts = job.attempts + 1;
+      const failed = attempts >= MAX_REPLY_ATTEMPTS;
+      await supabase.from("ai_reply_jobs").update({
+        status: failed ? "failed" : "pending",
+        error: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+        attempts,
+        locked_at: null,
+        run_after: new Date(Date.now() + attempts * 30_000).toISOString(),
+        ...(failed ? { processed_at: new Date().toISOString() } : {}),
+      }).eq("id", job.id);
+    }
+  }
+}
+
+function runReplyWorkerInBackground() {
+  const runtime = globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil(promise: Promise<unknown>): void } };
+  const work = processReplyJobs().catch((error) => console.error("WhatsApp AI reply worker failed:", error));
+  if (runtime.EdgeRuntime?.waitUntil) runtime.EdgeRuntime.waitUntil(work);
 }
 
 async function storeInboundMessage(
@@ -500,6 +636,7 @@ async function storeInboundMessage(
     conversationId: inserted?.conversation_id ?? conversation?.id ?? null,
     phone,
     content,
+    messageId: inserted.id,
   };
 }
 
