@@ -127,7 +127,7 @@ export async function processAiReplyQueue(opts: { businessId?: string; contactId
       continue;
     }
 
-    busyContacts.add(job.contact_id);
+    // Jobs run sequentially here, so later jobs for this contact follow in order.
     processed++;
 
     // A reply older than WhatsApp's 24h window can never be delivered as
