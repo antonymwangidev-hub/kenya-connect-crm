@@ -13,6 +13,7 @@ import { generateAndSendAiReply } from "@/lib/ai-auto-reply.server";
 
 const MAX_ATTEMPTS = 3;
 const LEASE_MS = 3 * 60 * 1000; // a job stuck "processing" this long is retried
+const STALE_MS = 23.5 * 60 * 60 * 1000; // past WhatsApp's free-form reply window
 
 export type EnqueueOpts = {
   businessId: string;
@@ -126,8 +127,21 @@ export async function processAiReplyQueue(opts: { businessId?: string; contactId
       continue;
     }
 
-    busyContacts.add(job.contact_id);
+    // Jobs run sequentially here, so later jobs for this contact follow in order.
     processed++;
+
+    // A reply older than WhatsApp's 24h window can never be delivered as
+    // free-form text; close it out so it can't clog the queue.
+    const { data: meta } = await supabaseAdmin
+      .from("ai_reply_jobs").select("created_at").eq("id", job.id).maybeSingle();
+    if (meta && Date.now() - new Date(meta.created_at).getTime() > STALE_MS) {
+      await supabaseAdmin.from("ai_reply_jobs").update({
+        status: "skipped", error: "expired: older than 24h reply window",
+        processed_at: new Date().toISOString(), locked_at: null,
+      }).eq("id", job.id);
+      busyContacts.delete(job.contact_id);
+      continue;
+    }
 
     try {
       const result = await generateAndSendAiReply({
@@ -151,7 +165,8 @@ export async function processAiReplyQueue(opts: { businessId?: string; contactId
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const attempts = job.attempts + 1;
-      const giveUp = attempts >= MAX_ATTEMPTS;
+      const permanent = /24-hour|window (has )?closed|window is closed/i.test(message);
+      const giveUp = permanent || attempts >= MAX_ATTEMPTS;
       await supabaseAdmin
         .from("ai_reply_jobs")
         .update({
