@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
-import { enqueueAiReply, processAiReplyQueue } from "@/lib/ai-reply-queue.server";
+import { replyToInboundNow } from "@/lib/ai-reply-queue.server";
 import { decryptSecret } from "@/lib/crypto.server";
 import { toE164, isE164, gatewayUpsertContact } from "@/lib/gateway.server";
 
@@ -275,15 +275,14 @@ export async function handleGatewayWebhook(request: Request, token: string | nul
 
       // Queue the reply so a burst of messages each gets answered, in order.
       try {
-        await enqueueAiReply({
+        await replyToInboundNow({
           businessId,
           contactId: contact.id,
           conversationId: conversation?.id ?? null,
           messageId: insertedInbound?.id ?? null,
           toPhone: phone,
           content: body,
-        });
-        await processAiReplyQueue({ businessId, contactId: contact.id, limit: 5 });
+        }, "nexus_gateway");
       } catch (aiErr) {
         console.error("[Gateway webhook] AI reply queue failed", aiErr);
       }

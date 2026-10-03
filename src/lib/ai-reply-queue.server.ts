@@ -185,3 +185,28 @@ export async function processAiReplyQueue(opts: { businessId?: string; contactId
 
   return { processed, sent, failed };
 }
+
+/**
+ * Called by the webhooks the moment an inbound message is stored: enqueue it
+ * and reply immediately (in order for that contact). The queue runner remains
+ * only a safety net. Outcome is written to webhook_logs for visibility.
+ */
+export async function replyToInboundNow(opts: EnqueueOpts, source: string) {
+  let outcome: unknown;
+  let errMsg: string | null = null;
+  try {
+    await enqueueAiReply(opts);
+    outcome = await processAiReplyQueue({ businessId: opts.businessId, contactId: opts.contactId, limit: 10 });
+  } catch (err) {
+    errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[AI reply] immediate reply failed", errMsg);
+  }
+  await supabaseAdmin.from("webhook_logs").insert({
+    business_id: opts.businessId,
+    source: `${source}_ai_reply`,
+    payload: { messageId: opts.messageId, contactId: opts.contactId, result: outcome ?? null } as never,
+    signature_ok: !errMsg,
+    processed_at: new Date().toISOString(),
+    error: errMsg ? errMsg.slice(0, 1000) : null,
+  });
+}
