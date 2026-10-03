@@ -144,7 +144,10 @@ Deno.serve(async (req: Request) => {
               }
             }
 
-            if (signatureOk && !processingError) runReplyWorkerInBackground();
+            // Reply right away, before responding, so the runtime can't drop the work.
+            if (signatureOk && !processingError) {
+              await processReplyJobs().catch((error) => console.error("WhatsApp AI reply worker failed:", error));
+            }
           }
         }
       }
