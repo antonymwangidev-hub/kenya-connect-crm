@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
-import { replyToInboundNow } from "@/lib/ai-reply-queue.server";
+import { replyToInboundNow, enqueueAiReply } from "@/lib/ai-reply-queue.server";
+import { runInBackground } from "@/lib/background.server";
 import { decryptSecret } from "@/lib/crypto.server";
 
 // Meta WhatsApp Cloud API webhook.
@@ -556,20 +557,22 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
 
                     await logWebhookEvent({ businessId, signatureOk: true, payload: trace });
 
-                    // Queue the AI reply (no-op if disabled for this business)
-                    // so every inbound message is answered, even in bursts.
+                    // Queue the AI reply durably, then generate + send it in the
+                    // background so Meta's webhook timeout can't cancel it.
+                    const replyOpts = {
+                      businessId,
+                      contactId: contact.id,
+                      conversationId: conversation.id,
+                      messageId: inserted?.id ?? null,
+                      toPhone: phone,
+                      content: text,
+                    };
                     try {
-                      await replyToInboundNow({
-                        businessId,
-                        contactId: contact.id,
-                        conversationId: conversation.id,
-                        messageId: inserted?.id ?? null,
-                        toPhone: phone,
-                        content: text,
-                      }, "meta");
+                      await enqueueAiReply(replyOpts);
                     } catch (aiErr) {
-                      console.error("[WA webhook] AI reply queue failed", aiErr);
+                      console.error("[WA webhook] AI reply enqueue failed", aiErr);
                     }
+                    runInBackground(replyToInboundNow(replyOpts, "meta"), "Meta AI reply");
                   } catch (messageError) {
                     const message = errorMessage(messageError);
                     trace.error = message;
