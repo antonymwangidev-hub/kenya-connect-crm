@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { checkRateLimit, clientIp, tooManyRequests } from "@/lib/rate-limit.server";
-import { replyToInboundNow } from "@/lib/ai-reply-queue.server";
+import { replyToInboundNow, enqueueAiReply } from "@/lib/ai-reply-queue.server";
+import { runInBackground } from "@/lib/background.server";
 import { decryptSecret } from "@/lib/crypto.server";
 import { toE164, isE164, gatewayUpsertContact } from "@/lib/gateway.server";
 
@@ -273,19 +274,23 @@ export async function handleGatewayWebhook(request: Request, token: string | nul
       if (insErr) throw insErr;
       await logEvent(businessId, payload);
 
-      // Queue the reply so a burst of messages each gets answered, in order.
+      // Queue the reply durably first, then answer the gateway right away and
+      // let the AI generate + send in the background (the gateway times out
+      // after a few seconds, which used to cancel the reply mid-flight).
+      const replyOpts = {
+        businessId,
+        contactId: contact.id,
+        conversationId: conversation?.id ?? null,
+        messageId: insertedInbound?.id ?? null,
+        toPhone: phone,
+        content: body,
+      };
       try {
-        await replyToInboundNow({
-          businessId,
-          contactId: contact.id,
-          conversationId: conversation?.id ?? null,
-          messageId: insertedInbound?.id ?? null,
-          toPhone: phone,
-          content: body,
-        }, "nexus_gateway");
+        await enqueueAiReply(replyOpts);
       } catch (aiErr) {
-        console.error("[Gateway webhook] AI reply queue failed", aiErr);
+        console.error("[Gateway webhook] AI reply enqueue failed", aiErr);
       }
+      runInBackground(replyToInboundNow(replyOpts, "nexus_gateway"), "Gateway AI reply");
       return new Response("ok", { status: 200 });
     }
 
